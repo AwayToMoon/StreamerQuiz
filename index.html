@@ -343,12 +343,37 @@
         const encryptedConfig = "U2FsdGVkX1/2h2jz/okQRoolhPVQPafedlkbIfYoDr/bEIj6Qe4Gz4D+GJsaaQ5i7XVMwWJ+cqe94PGWRSvfQKwZHwpHdIr9YhzTEVGwzq0yCkU/7ZsA1fNW0THeJjRP5W+tborqv2W5F8pHhVoVtYy104eDojx6YeaaKd4zyAr36a1eAY82nlgIUMhzbl8s7LEWqoqk/w+4brkq8Gt7zZ2zkCij2mwXb8LEyZJBFSa0j62QdI8cKkSwBRw3MxO56KTu4tLFcbv7hhehDtKwM0PNJMkuDp+xldtmmvIOS56fR64kvsLXlkN/DSV+3MHLWFCHv/ry06NtgMy6aEz3mfFQUqP0uaTR+ohi3niWSNYJ+wMNgQsV6xiXj+VmKleN";
         
         function initFirebase() {
-            const secretKey = "HigherCellF-Games-2024";
-            const decrypted = CryptoJS.AES.decrypt(encryptedConfig, secretKey).toString(CryptoJS.enc.Utf8);
-            const firebaseConfig = JSON.parse(decrypted);
-            
-            firebase.initializeApp(firebaseConfig);
-            window.db = firebase.firestore();
+            try {
+                const secretKey = "HigherCellF-Games-2024";
+                const decrypted = CryptoJS.AES.decrypt(encryptedConfig, secretKey).toString(CryptoJS.enc.Utf8);
+                
+                if (!decrypted) {
+                    console.error('Failed to decrypt Firebase config');
+                    return;
+                }
+                
+                const firebaseConfig = JSON.parse(decrypted);
+                
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
+                }
+                
+                window.db = firebase.firestore();
+                
+                // Enable offline persistence for better reliability
+                window.db.enablePersistence().catch((err) => {
+                    if (err.code === 'failed-precondition') {
+                        console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
+                    } else if (err.code === 'unimplemented') {
+                        console.warn('Persistence is not available in this browser.');
+                    }
+                });
+                
+                console.log('Firebase initialized successfully');
+            } catch (error) {
+                console.error('Error initializing Firebase:', error);
+                window.db = null;
+            }
         }
 
         initFirebase();
