@@ -1,8 +1,8 @@
 // Login Credentials
 const LOGIN_CREDENTIALS = {
-    host: 'Away',
-    streamer1: 'Higher',
-    streamer2: 'OGAle'
+    host: 'Away2025',
+    streamer1: 'HigherCellF2025',
+    streamer2: 'OGAle_2025'
 };
 
 // Custom Modal System
@@ -137,6 +137,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initLogin();
     listenToGameState();
+    
+    // Initialize default questions in Firebase immediately
+    initializeDefaultQuestions();
     
     // Check Firebase connection after a short delay
     setTimeout(() => {
@@ -1123,6 +1126,37 @@ function listenToGameState() {
     });
 }
 
+// Initialize default questions in Firebase
+function initializeDefaultQuestions() {
+    if (!window.db) {
+        console.log('Firebase not available, using local questions only');
+        return;
+    }
+    
+    window.db.collection('quiz').doc('gameState').get().then((doc) => {
+        const data = doc.data();
+        // If Firebase has no questions or fewer questions, update it with defaults
+        if (!data || !data.questions || data.questions.length === 0) {
+            console.log('Initializing Firebase with default questions...');
+            window.db.collection('quiz').doc('gameState').set({
+                ...gameState,
+                questions: defaultQuestions,
+                lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true }).then(() => {
+                console.log('Default questions synced to Firebase successfully');
+                gameState.questions = [...defaultQuestions];
+            }).catch(error => {
+                console.error('Error syncing default questions:', error);
+            });
+        } else {
+            console.log('Firebase already has questions, loading them...');
+            gameState.questions = data.questions;
+        }
+    }).catch(error => {
+        console.error('Error checking Firebase questions:', error);
+    });
+}
+
 // Initialize default questions - 30 Schwierige Anime Fragen (jeweils aus einem anderen Anime)
 const defaultQuestions = [
     {
@@ -1279,26 +1313,4 @@ const defaultQuestions = [
 
 // Initialize questions in gameState
 gameState.questions = [...defaultQuestions];
-
-// Sync default questions to Firebase on first load
-if (window.db) {
-    window.db.collection('quiz').doc('gameState').get().then((doc) => {
-        const data = doc.data();
-        // If Firebase has no questions or fewer questions, update it with defaults
-        if (!data || !data.questions || data.questions.length === 0) {
-            console.log('Initializing Firebase with default questions...');
-            window.db.collection('quiz').doc('gameState').set({
-                ...gameState,
-                questions: defaultQuestions,
-                lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true }).then(() => {
-                console.log('Default questions synced to Firebase successfully');
-            }).catch(error => {
-                console.error('Error syncing default questions:', error);
-            });
-        }
-    }).catch(error => {
-        console.error('Error checking Firebase questions:', error);
-    });
-}
 
