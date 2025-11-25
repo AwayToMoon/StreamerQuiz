@@ -566,12 +566,18 @@ function loadQuestion() {
     if (gameState.questions && gameState.questions.length > 0 && gameState.questionIndex < gameState.questions.length) {
         // Always load question from array to ensure it's correct
         gameState.currentQuestion = gameState.questions[gameState.questionIndex];
-        gameState.answers.streamer1 = null;
-        gameState.answers.streamer2 = null;
+        
+        // Reset answers ONLY if we are the host
+        // Streamers will have their answers reset via Firebase listener when question changes
+        if (currentRole === 'host') {
+            gameState.answers.streamer1 = null;
+            gameState.answers.streamer2 = null;
+        }
 
         console.log('Loading question:', {
             index: gameState.questionIndex,
-            question: gameState.currentQuestion.question.substring(0, 50) + '...'
+            question: gameState.currentQuestion.question.substring(0, 50) + '...',
+            role: currentRole
         });
 
         // Update UI first to show question immediately
@@ -1042,17 +1048,35 @@ function listenToGameState() {
                 ? data.questions 
                 : (gameState.questions && gameState.questions.length > 0 ? gameState.questions : []);
             
+            // Determine which answer key belongs to this streamer
+            const myAnswerKey = currentRole === 'streamer1' ? 'streamer1' : 'streamer2';
+            const otherAnswerKey = currentRole === 'streamer1' ? 'streamer2' : 'streamer1';
+            
+            // CRITICAL FIX: Preserve this streamer's local answer unless question changed
+            // Only sync the OTHER streamer's answer from Firebase
+            const shouldResetMyAnswer = oldQuestionIndex !== data.questionIndex || 
+                                       oldStatus === 'waiting' && data.status === 'active' ||
+                                       data.status === 'waiting';
+            
             gameState = {
                 ...gameState,
                 ...data,
                 // Use questions from Firebase if available, otherwise keep local
                 questions: questionsToUse,
-                // Preserve local answers until evaluated
+                // Preserve local answer for this streamer, but sync other streamer's answer
                 answers: {
-                    streamer1: data.answers?.streamer1 ?? gameState.answers.streamer1,
-                    streamer2: data.answers?.streamer2 ?? gameState.answers.streamer2
+                    [myAnswerKey]: shouldResetMyAnswer ? null : gameState.answers[myAnswerKey],
+                    [otherAnswerKey]: data.answers?.[otherAnswerKey] ?? null
                 }
             };
+
+            console.log('Streamer Firebase update:', {
+                role: currentRole,
+                myAnswer: gameState.answers[myAnswerKey],
+                otherAnswer: gameState.answers[otherAnswerKey],
+                questionChanged: oldQuestionIndex !== data.questionIndex,
+                shouldReset: shouldResetMyAnswer
+            });
 
             // CRITICAL: Always ensure currentQuestion is set when status is active
             if (gameState.status === 'active') {
@@ -1078,13 +1102,6 @@ function listenToGameState() {
                         hasDataCurrentQuestion: !!data.currentQuestion
                     });
                 }
-            }
-
-            // If question changed, reset local answer
-            if (oldQuestionIndex !== gameState.questionIndex) {
-                const answerKey = currentRole === 'streamer1' ? 'streamer1' : 'streamer2';
-                gameState.answers[answerKey] = null;
-                console.log('Question index changed, reset answer for', answerKey);
             }
 
             // Load videos if changed
