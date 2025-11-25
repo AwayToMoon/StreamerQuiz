@@ -724,7 +724,8 @@ function updateUI() {
                 const answer1 = gameState.answers.streamer1;
                 const answerText1 = document.getElementById('live-answer-text-1');
                 if (answerText1) {
-                    if (answer1 !== null && answer1 !== undefined && gameState.currentQuestion && gameState.currentQuestion.answers) {
+                    console.log('Host Live Display - Streamer1 answer:', answer1, 'hasQuestion:', !!gameState.currentQuestion);
+                    if (answer1 !== null && answer1 !== undefined && gameState.currentQuestion && gameState.currentQuestion.answers && gameState.currentQuestion.answers[answer1]) {
                         const answerLetter = String.fromCharCode(65 + answer1);
                         answerText1.textContent = `${answerLetter}: ${gameState.currentQuestion.answers[answer1]}`;
                         answerText1.style.color = 'var(--streamer1-color)';
@@ -740,7 +741,8 @@ function updateUI() {
                 const answer2 = gameState.answers.streamer2;
                 const answerText2 = document.getElementById('live-answer-text-2');
                 if (answerText2) {
-                    if (answer2 !== null && answer2 !== undefined && gameState.currentQuestion && gameState.currentQuestion.answers) {
+                    console.log('Host Live Display - Streamer2 answer:', answer2, 'hasQuestion:', !!gameState.currentQuestion);
+                    if (answer2 !== null && answer2 !== undefined && gameState.currentQuestion && gameState.currentQuestion.answers && gameState.currentQuestion.answers[answer2]) {
                         const answerLetter = String.fromCharCode(65 + answer2);
                         answerText2.textContent = `${answerLetter}: ${gameState.currentQuestion.answers[answer2]}`;
                         answerText2.style.color = 'var(--streamer2-color)';
@@ -842,7 +844,8 @@ function updateUI() {
                 streamer2Answer: answer2,
                 streamer1Correct: result1,
                 streamer2Correct: result2,
-                currentScores: gameState.scores
+                currentScores: gameState.scores,
+                allAnswers: gameState.answers
             });
             
             // Update streamer 1 card
@@ -953,6 +956,19 @@ function listenToGameState() {
                      data.videoLinks.streamer2 !== gameState.videoLinks.streamer2)) {
                     gameState.videoLinks = data.videoLinks;
                     loadVideos();
+                }
+                
+                // CRITICAL: Host must receive answers from streamers to show live answers
+                if (data.answers) {
+                    // Only update answers if they changed (to see streamer responses)
+                    if (data.answers.streamer1 !== gameState.answers.streamer1 ||
+                        data.answers.streamer2 !== gameState.answers.streamer2) {
+                        gameState.answers = {
+                            streamer1: data.answers.streamer1 ?? gameState.answers.streamer1,
+                            streamer2: data.answers.streamer2 ?? gameState.answers.streamer2
+                        };
+                        console.log('Host: Received answers update:', gameState.answers);
+                    }
                 }
                 
                 // Update UI for host too (for immediate feedback)
