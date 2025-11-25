@@ -132,9 +132,22 @@ let gameState = {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('Initializing application...');
+    console.log('Firebase available:', !!window.db);
+    
     initLogin();
     initGame();
     listenToGameState();
+    
+    // Check Firebase connection after a short delay
+    setTimeout(() => {
+        if (!window.db) {
+            console.error('Firebase not initialized after DOM load');
+            showModal('Warnung', 'Firebase-Verbindung konnte nicht hergestellt werden. Die Seite funktioniert möglicherweise nicht vollständig.', 'warning');
+        } else {
+            console.log('Firebase initialized successfully');
+        }
+    }, 1000);
 });
 
 // Login System
@@ -292,6 +305,9 @@ function initHostControls() {
             showModal('Fehler', 'Bitte füge zuerst Fragen hinzu!', 'error');
             return;
         }
+        
+        console.log('Starting quiz...');
+        
         gameState.status = 'active';
         gameState.questionIndex = 0;
         gameState.scores.streamer1 = 0;
@@ -299,17 +315,28 @@ function initHostControls() {
         gameState.round = 1;
         gameState.answers.streamer1 = null;
         gameState.answers.streamer2 = null;
+        
         // Ensure currentQuestion is set before updating - use index 0 explicitly
         if (gameState.questions && gameState.questions.length > 0) {
             gameState.currentQuestion = gameState.questions[0];
-            // Force UI update immediately
-            updateUI();
         }
+        
+        // Update Firebase first, then UI
         updateGameState();
-        loadQuestion(); // This will also update UI
+        
+        // Also call loadQuestion to ensure everything is set up
+        loadQuestion();
+        
+        // Update button states
         startQuizBtn.disabled = true;
         document.getElementById('show-answers-btn').disabled = false;
         nextQuestionBtn.disabled = true;
+        
+        console.log('Quiz started, state:', {
+            status: gameState.status,
+            questionIndex: gameState.questionIndex,
+            round: gameState.round
+        });
     });
 
     const showAnswersBtn = document.getElementById('show-answers-btn');
@@ -324,13 +351,17 @@ function initHostControls() {
 
     nextQuestionBtn.addEventListener('click', () => {
         if (gameState.questionIndex < gameState.questions.length - 1) {
+            console.log('Moving to next question...');
             gameState.questionIndex++;
             gameState.round++;
             gameState.status = 'active';
             gameState.answers.streamer1 = null;
             gameState.answers.streamer2 = null;
+            
+            // Load question first, then update state
             loadQuestion();
             updateGameState();
+            
             showAnswersBtn.disabled = false;
             nextQuestionBtn.disabled = true;
         } else {
@@ -485,6 +516,7 @@ function resetQuiz() {
 // Game Logic
 function loadQuestion() {
     if (gameState.questionIndex >= gameState.questions.length) {
+        console.warn('Question index out of bounds');
         return;
     }
 
@@ -494,10 +526,21 @@ function loadQuestion() {
         gameState.answers.streamer1 = null;
         gameState.answers.streamer2 = null;
 
+        console.log('Loading question:', {
+            index: gameState.questionIndex,
+            question: gameState.currentQuestion.question.substring(0, 50) + '...'
+        });
+
         // Update UI first to show question immediately
         updateUI();
         // Then sync to Firebase
         updateGameState();
+    } else {
+        console.error('Cannot load question - questions array issue:', {
+            hasQuestions: !!gameState.questions,
+            questionsLength: gameState.questions?.length,
+            questionIndex: gameState.questionIndex
+        });
     }
 }
 
@@ -505,6 +548,12 @@ function evaluateAnswers() {
     const correctAnswer = gameState.currentQuestion.correct;
     const answer1 = gameState.answers.streamer1;
     const answer2 = gameState.answers.streamer2;
+
+    console.log('Evaluating answers:', {
+        correctAnswer: correctAnswer,
+        streamer1: answer1,
+        streamer2: answer2
+    });
 
     // Update scores
     if (answer1 === correctAnswer) {
@@ -527,6 +576,7 @@ function submitAnswer(answerIndex) {
     }
 
     if (gameState.status !== 'active') {
+        console.warn('Cannot submit answer - quiz not active');
         return;
     }
 
@@ -536,6 +586,12 @@ function submitAnswer(answerIndex) {
         showModal('Info', 'Du hast bereits geantwortet!', 'info');
         return;
     }
+
+    console.log('Submitting answer:', {
+        streamer: answerKey,
+        answerIndex: answerIndex,
+        answer: String.fromCharCode(65 + answerIndex)
+    });
 
     gameState.answers[answerKey] = answerIndex;
     updateGameState();
@@ -705,10 +761,11 @@ function updateUI() {
 
 // Firebase Integration
 function updateGameState() {
+    // Always update UI first for immediate feedback
+    updateUI();
+    
     if (!window.db) {
         console.warn('Firebase not initialized - running in local mode only');
-        // Still update UI even without Firebase
-        updateUI();
         return;
     }
 
@@ -720,11 +777,20 @@ function updateGameState() {
         lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    window.db.collection('quiz').doc('gameState').set(stateToUpdate).catch(error => {
-        console.error('Error updating game state:', error);
-        // Still update UI even if Firebase fails
-        updateUI();
+    console.log('Updating game state to Firebase:', {
+        status: gameState.status,
+        questionIndex: gameState.questionIndex,
+        round: gameState.round
     });
+
+    window.db.collection('quiz').doc('gameState').set(stateToUpdate, { merge: false })
+        .then(() => {
+            console.log('Game state updated successfully to Firebase');
+        })
+        .catch(error => {
+            console.error('Error updating game state:', error);
+            // UI already updated above, so we're good
+        });
 }
 
 function listenToGameState() {
@@ -733,19 +799,49 @@ function listenToGameState() {
         return;
     }
 
+    console.log('Setting up Firebase listener for game state...');
+
     window.db.collection('quiz').doc('gameState').onSnapshot((doc) => {
         if (doc.exists()) {
             const data = doc.data();
             
-            // Don't update if we're the host and just updated
+            console.log('Firebase update received:', {
+                status: data.status,
+                questionIndex: data.questionIndex,
+                round: data.round,
+                currentRole: currentRole
+            });
+            
+            // Host should also update UI when state changes (for immediate feedback)
+            // but we need to be careful not to overwrite local changes
             if (currentRole === 'host') {
-                // Host controls the state, but still sync videos
+                // Host controls the state, but sync videos and update UI
                 if (data.videoLinks && 
                     (data.videoLinks.streamer1 !== gameState.videoLinks.streamer1 ||
                      data.videoLinks.streamer2 !== gameState.videoLinks.streamer2)) {
                     gameState.videoLinks = data.videoLinks;
                     loadVideos();
                 }
+                
+                // Update UI for host too (for immediate feedback)
+                // Only sync non-critical fields from Firebase to avoid conflicts
+                if (data.status && data.status !== gameState.status) {
+                    gameState.status = data.status;
+                }
+                if (data.questionIndex !== undefined && data.questionIndex !== gameState.questionIndex) {
+                    gameState.questionIndex = data.questionIndex;
+                }
+                if (data.round !== undefined && data.round !== gameState.round) {
+                    gameState.round = data.round;
+                }
+                if (data.scores) {
+                    gameState.scores = { ...gameState.scores, ...data.scores };
+                }
+                if (data.currentQuestion && data.currentQuestion.question) {
+                    gameState.currentQuestion = data.currentQuestion;
+                }
+                
+                updateUI();
                 return;
             }
 
@@ -806,10 +902,14 @@ function listenToGameState() {
                 loadVideos();
             }
 
+            console.log('Updating UI after Firebase sync');
             updateUI();
+        } else {
+            console.warn('Firebase document does not exist');
         }
     }, (error) => {
         console.error('Error listening to game state:', error);
+        showModal('Fehler', 'Verbindung zu Firebase verloren. Bitte Seite neu laden.', 'error');
     });
 }
 
