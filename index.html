@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streamer Quiz Duell - HigherCellF vs OGAle_</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="particles-container">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="login-modal active">
+        <div class="login-modal-content">
+            <div class="login-header">
+                <h1><i class="fas fa-gamepad"></i> Streamer Quiz Duell</h1>
+                <p class="login-subtitle">Wähle deine Rolle</p>
+            </div>
+            <div class="login-options">
+                <div class="login-option" data-role="host">
+                    <div class="login-icon host-icon">
+                        <i class="fas fa-crown"></i>
+                    </div>
+                    <h3>HOST (Away)</h3>
+                </div>
+                <div class="login-option" data-role="streamer1">
+                    <div class="login-icon streamer1-icon">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <h3>HigherCellF</h3>
+                </div>
+                <div class="login-option" data-role="streamer2">
+                    <div class="login-icon streamer2-icon">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <h3>OGAle_</h3>
+                </div>
+            </div>
+            <div class="login-form" id="login-form" style="display: none;">
+                <input type="password" id="password-input" class="password-input" placeholder="Passwort eingeben..." autocomplete="off">
+                <button class="login-btn" id="login-submit">
+                    <i class="fas fa-sign-in-alt"></i> Einloggen
+                </button>
+                <button class="back-btn" id="back-btn">
+                    <i class="fas fa-arrow-left"></i> Zurück
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Game Container -->
+    <div id="game-container" class="game-container" style="display: none;">
+        <!-- Header -->
+        <header class="game-header">
+            <div class="header-left">
+                <h1 class="game-title">
+                    <i class="fas fa-trophy"></i> Quiz Duell
+                </h1>
+            </div>
+            <div class="header-center">
+                <div class="round-info" id="round-info">
+                    <span class="round-label">Runde</span>
+                    <span class="round-number" id="round-number">1</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="user-info" id="user-info">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="current-user">-</span>
+                </div>
+                <button class="logout-btn" id="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Host Control Panel -->
+        <div id="host-panel" class="host-panel" style="display: none;">
+            <div class="host-panel-header">
+                <h3><i class="fas fa-sliders-h"></i> Host Control Panel</h3>
+            </div>
+            <div class="host-controls">
+                <div class="control-group">
+                    <label>VDO.Ninja Links:</label>
+                    <div class="video-inputs">
+                        <input type="text" id="video-link-1" class="video-link-input" placeholder="HigherCellF Video Link...">
+                        <input type="text" id="video-link-2" class="video-link-input" placeholder="OGAle_ Video Link...">
+                    </div>
+                    <button class="control-btn" id="load-videos-btn">
+                        <i class="fas fa-video"></i> Videos laden
+                    </button>
+                </div>
+                <div class="control-group">
+                    <label>Quiz Steuerung:</label>
+                    <div class="quiz-controls">
+                        <button class="control-btn" id="start-quiz-btn">
+                            <i class="fas fa-play"></i> Quiz starten
+                        </button>
+                        <button class="control-btn" id="show-answers-btn" disabled>
+                            <i class="fas fa-eye"></i> Antworten anzeigen
+                        </button>
+                        <button class="control-btn" id="next-question-btn" disabled>
+                            <i class="fas fa-forward"></i> Nächste Frage
+                        </button>
+                        <button class="control-btn" id="reset-quiz-btn">
+                            <i class="fas fa-redo"></i> Quiz zurücksetzen
+                        </button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Frage hinzufügen:</label>
+                    <div class="question-inputs">
+                        <input type="text" id="question-text" class="question-input" placeholder="Frage...">
+                        <div class="answers-inputs">
+                            <input type="text" class="answer-input" data-answer="0" placeholder="Antwort A...">
+                            <input type="text" class="answer-input" data-answer="1" placeholder="Antwort B...">
+                            <input type="text" class="answer-input" data-answer="2" placeholder="Antwort C...">
+                            <input type="text" class="answer-input" data-answer="3" placeholder="Antwort D...">
+                        </div>
+                        <select id="correct-answer" class="correct-answer-select">
+                            <option value="0">A ist richtig</option>
+                            <option value="1">B ist richtig</option>
+                            <option value="2">C ist richtig</option>
+                            <option value="3">D ist richtig</option>
+                        </select>
+                        <button class="control-btn" id="add-question-btn">
+                            <i class="fas fa-plus"></i> Frage hinzufügen
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Game Area -->
+        <div class="game-area">
+            <!-- Video Streams -->
+            <div class="video-container">
+                <div class="streamer-video" id="streamer1-video">
+                    <div class="video-header">
+                        <div class="streamer-name streamer1-name">
+                            <i class="fas fa-user"></i> HigherCellF
+                        </div>
+                        <div class="streamer-score" id="score-1">0</div>
+                    </div>
+                    <div class="video-wrapper" id="video-wrapper-1">
+                        <div class="video-placeholder">
+                            <i class="fas fa-video-slash"></i>
+                            <p>Kein Video geladen</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="vs-divider">
+                    <div class="vs-circle">
+                        <span>VS</span>
+                    </div>
+                </div>
+                <div class="streamer-video" id="streamer2-video">
+                    <div class="video-header">
+                        <div class="streamer-name streamer2-name">
+                            <i class="fas fa-user"></i> OGAle_
+                        </div>
+                        <div class="streamer-score" id="score-2">0</div>
+                    </div>
+                    <div class="video-wrapper" id="video-wrapper-2">
+                        <div class="video-placeholder">
+                            <i class="fas fa-video-slash"></i>
+                            <p>Kein Video geladen</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quiz Question Area -->
+            <div class="quiz-area" id="quiz-area">
+                <div class="quiz-waiting" id="quiz-waiting">
+                    <div class="waiting-content">
+                        <i class="fas fa-hourglass-half"></i>
+                        <h2>Warte auf Quiz-Start...</h2>
+                        <p>Der Host startet das Quiz gleich!</p>
+                    </div>
+                </div>
+
+                <div class="quiz-active" id="quiz-active" style="display: none;">
+                    <div class="question-card">
+                        <div class="question-header">
+                            <span class="question-number" id="question-number">Frage 1</span>
+                        </div>
+                        <h2 class="question-text" id="question-text">Frage wird geladen...</h2>
+                    </div>
+                    <div class="answers-grid" id="answers-grid">
+                        <!-- Answers will be dynamically inserted -->
+                    </div>
+                </div>
+
+                <div class="quiz-result" id="quiz-result" style="display: none;">
+                    <div class="result-content">
+                        <!-- Streamer View -->
+                        <div id="result-streamer-view" style="display: none;">
+                            <i class="fas fa-check-circle result-icon correct" id="result-icon"></i>
+                            <h2 id="result-text">Richtig!</h2>
+                            <p id="result-explanation"></p>
+                        </div>
+                        <!-- Host View -->
+                        <div id="result-host-view" style="display: none;">
+                            <div class="result-header">
+                                <h3><i class="fas fa-trophy"></i> Ergebnis</h3>
+                            </div>
+                            <div class="result-streamers">
+                                <div class="result-streamer-card" id="result-streamer1">
+                                    <div class="result-streamer-header">
+                                        <div class="result-streamer-name">
+                                            <i class="fas fa-user"></i> HigherCellF
+                                        </div>
+                                        <div class="result-status" id="result-status-1">
+                                            <i class="fas fa-check-circle"></i>
+                                            <span>Richtig</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="result-streamer-card" id="result-streamer2">
+                                    <div class="result-streamer-header">
+                                        <div class="result-streamer-name">
+                                            <i class="fas fa-user"></i> OGAle_
+                                        </div>
+                                        <div class="result-status" id="result-status-2">
+                                            <i class="fas fa-check-circle"></i>
+                                            <span>Richtig</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="result-correct-answer">
+                                <i class="fas fa-lightbulb"></i>
+                                <span>Richtige Antwort: <strong id="correct-answer-display">A</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Welcome Modal for Streamers -->
+    <div id="welcome-streamer-modal" class="welcome-streamer-modal">
+        <div class="welcome-streamer-modal-content">
+            <div class="welcome-streamer-modal-header">
+                <h2><i class="fas fa-gamepad"></i> Willkommen beim Quiz Duell!</h2>
+                <button class="welcome-streamer-modal-close" id="close-welcome-streamer-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="welcome-streamer-modal-body">
+                <div class="welcome-section">
+                    <h3><i class="fas fa-info-circle"></i> Wie funktioniert's?</h3>
+                    <div class="welcome-steps">
+                        <div class="welcome-step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <h4>Warte auf Quiz-Start</h4>
+                                <p>Der Host startet das Quiz. Du siehst die Frage und Antworten sobald das Quiz beginnt.</p>
+                            </div>
+                        </div>
+                        <div class="welcome-step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <h4>Antworte auf Fragen</h4>
+                                <p>Klicke auf eine der vier Antwortmöglichkeiten (A, B, C oder D). Du hast 30 Sekunden Zeit pro Frage.</p>
+                            </div>
+                        </div>
+                        <div class="welcome-step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <h4>Erhalte Feedback</h4>
+                                <p>Nach jeder Frage siehst du, ob deine Antwort richtig oder falsch war. Dein Score wird automatisch aktualisiert.</p>
+                            </div>
+                        </div>
+                        <div class="welcome-step">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <h4>Gewinne das Duell</h4>
+                                <p>Am Ende gewinnt der Streamer mit den meisten richtigen Antworten!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="welcome-tips">
+                    <h4><i class="fas fa-lightbulb"></i> Tipps:</h4>
+                    <ul>
+                        <li>Du kannst nur einmal pro Frage antworten</li>
+                        <li>Wenn beide Streamer geantwortet haben, wird sofort ausgewertet</li>
+                        <li>Der Timer läuft weiter, auch wenn du schon geantwortet hast</li>
+                        <li>Dein Score wird oben rechts neben deinem Namen angezeigt</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="welcome-streamer-modal-footer">
+                <label class="dont-show-again">
+                    <input type="checkbox" id="dont-show-welcome-streamer">
+                    <span>Nicht mehr anzeigen</span>
+                </label>
+                <button class="welcome-streamer-btn" id="welcome-streamer-understood">
+                    <i class="fas fa-check"></i> Verstanden!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Modal -->
+    <div id="custom-modal" class="custom-modal">
+        <div class="custom-modal-content">
+            <div class="custom-modal-header">
+                <h3 id="modal-title">Information</h3>
+                <button class="custom-modal-close" id="modal-close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="custom-modal-body">
+                <p id="modal-message"></p>
+            </div>
+            <div class="custom-modal-footer">
+                <button class="custom-modal-btn" id="modal-ok-btn">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Configuration -->
+    <script>
+        const encryptedConfig = "U2FsdGVkX1/2h2jz/okQRoolhPVQPafedlkbIfYoDr/bEIj6Qe4Gz4D+GJsaaQ5i7XVMwWJ+cqe94PGWRSvfQKwZHwpHdIr9YhzTEVGwzq0yCkU/7ZsA1fNW0THeJjRP5W+tborqv2W5F8pHhVoVtYy104eDojx6YeaaKd4zyAr36a1eAY82nlgIUMhzbl8s7LEWqoqk/w+4brkq8Gt7zZ2zkCij2mwXb8LEyZJBFSa0j62QdI8cKkSwBRw3MxO56KTu4tLFcbv7hhehDtKwM0PNJMkuDp+xldtmmvIOS56fR64kvsLXlkN/DSV+3MHLWFCHv/ry06NtgMy6aEz3mfFQUqP0uaTR+ohi3niWSNYJ+wMNgQsV6xiXj+VmKleN";
+        
+        function initFirebase() {
+            const secretKey = "HigherCellF-Games-2024";
+            const decrypted = CryptoJS.AES.decrypt(encryptedConfig, secretKey).toString(CryptoJS.enc.Utf8);
+            const firebaseConfig = JSON.parse(decrypted);
+            
+            firebase.initializeApp(firebaseConfig);
+            window.db = firebase.firestore();
+        }
+
+        initFirebase();
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>
+
