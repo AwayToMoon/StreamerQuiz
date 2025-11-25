@@ -1124,7 +1124,7 @@ function listenToGameState() {
 }
 
 // Initialize default questions - 30 Schwierige Anime Fragen (jeweils aus einem anderen Anime)
-gameState.questions = [
+const defaultQuestions = [
     {
         question: "Wie heißt der Stand von Jotaro Kujo in 'JoJo's Bizarre Adventure: Stardust Crusaders'?",
         answers: ["Star Platinum", "The World", "Hierophant Green", "Silver Chariot"],
@@ -1276,4 +1276,29 @@ gameState.questions = [
         correct: 1
     }
 ];
+
+// Initialize questions in gameState
+gameState.questions = [...defaultQuestions];
+
+// Sync default questions to Firebase on first load
+if (window.db) {
+    window.db.collection('quiz').doc('gameState').get().then((doc) => {
+        const data = doc.data();
+        // If Firebase has no questions or fewer questions, update it with defaults
+        if (!data || !data.questions || data.questions.length === 0) {
+            console.log('Initializing Firebase with default questions...');
+            window.db.collection('quiz').doc('gameState').set({
+                ...gameState,
+                questions: defaultQuestions,
+                lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true }).then(() => {
+                console.log('Default questions synced to Firebase successfully');
+            }).catch(error => {
+                console.error('Error syncing default questions:', error);
+            });
+        }
+    }).catch(error => {
+        console.error('Error checking Firebase questions:', error);
+    });
+}
 
