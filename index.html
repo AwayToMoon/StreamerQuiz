@@ -225,9 +225,37 @@
                     <div class="result-content">
                         <!-- Streamer View -->
                         <div id="result-streamer-view" style="display: none;">
-                            <i class="fas fa-check-circle result-icon correct" id="result-icon"></i>
-                            <h2 id="result-text">Richtig!</h2>
-                            <p id="result-explanation"></p>
+                            <div class="result-header">
+                                <h3><i class="fas fa-trophy"></i> Ergebnis</h3>
+                            </div>
+                            <div class="result-streamers">
+                                <div class="result-streamer-card" id="result-streamer-view-1">
+                                    <div class="result-streamer-header">
+                                        <div class="result-streamer-name">
+                                            <i class="fas fa-user"></i> HigherCellF
+                                        </div>
+                                        <div class="result-status" id="result-streamer-status-1">
+                                            <i class="fas fa-check-circle"></i>
+                                            <span>Richtig</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="result-streamer-card" id="result-streamer-view-2">
+                                    <div class="result-streamer-header">
+                                        <div class="result-streamer-name">
+                                            <i class="fas fa-user"></i> OGAle_
+                                        </div>
+                                        <div class="result-status" id="result-streamer-status-2">
+                                            <i class="fas fa-check-circle"></i>
+                                            <span>Richtig</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="result-correct-answer">
+                                <i class="fas fa-lightbulb"></i>
+                                <span>Richtige Antwort: <strong id="result-streamer-correct-answer">A</strong></span>
+                            </div>
                         </div>
                         <!-- Host View -->
                         <div id="result-host-view" style="display: none;">
