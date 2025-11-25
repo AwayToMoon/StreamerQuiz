@@ -595,16 +595,21 @@ function evaluateAnswers() {
     console.log('Evaluating answers:', {
         correctAnswer: correctAnswer,
         streamer1: answer1,
-        streamer2: answer2
+        streamer2: answer2,
+        currentScores: { ...gameState.scores }
     });
 
-    // Update scores
-    if (answer1 === correctAnswer) {
+    // Update scores - only if answer is not null/undefined and matches correct answer
+    if (answer1 !== null && answer1 !== undefined && answer1 === correctAnswer) {
         gameState.scores.streamer1++;
+        console.log('Streamer1 scored! New score:', gameState.scores.streamer1);
     }
-    if (answer2 === correctAnswer) {
+    if (answer2 !== null && answer2 !== undefined && answer2 === correctAnswer) {
         gameState.scores.streamer2++;
+        console.log('Streamer2 scored! New score:', gameState.scores.streamer2);
     }
+
+    console.log('Final scores after evaluation:', gameState.scores);
 
     gameState.status = 'result';
     updateGameState();
@@ -709,6 +714,48 @@ function updateUI() {
             }
         }
 
+        // Update Host Live Answers Display
+        const hostLiveAnswers = document.getElementById('host-live-answers');
+        if (hostLiveAnswers) {
+            if (currentRole === 'host') {
+                hostLiveAnswers.style.display = 'block';
+                
+                // Update Streamer 1 answer
+                const answer1 = gameState.answers.streamer1;
+                const answerText1 = document.getElementById('live-answer-text-1');
+                if (answerText1) {
+                    if (answer1 !== null && answer1 !== undefined && gameState.currentQuestion && gameState.currentQuestion.answers) {
+                        const answerLetter = String.fromCharCode(65 + answer1);
+                        answerText1.textContent = `${answerLetter}: ${gameState.currentQuestion.answers[answer1]}`;
+                        answerText1.style.color = 'var(--streamer1-color)';
+                        answerText1.style.fontWeight = '600';
+                    } else {
+                        answerText1.textContent = 'Noch keine Antwort';
+                        answerText1.style.color = 'var(--text-secondary)';
+                        answerText1.style.fontWeight = '400';
+                    }
+                }
+                
+                // Update Streamer 2 answer
+                const answer2 = gameState.answers.streamer2;
+                const answerText2 = document.getElementById('live-answer-text-2');
+                if (answerText2) {
+                    if (answer2 !== null && answer2 !== undefined && gameState.currentQuestion && gameState.currentQuestion.answers) {
+                        const answerLetter = String.fromCharCode(65 + answer2);
+                        answerText2.textContent = `${answerLetter}: ${gameState.currentQuestion.answers[answer2]}`;
+                        answerText2.style.color = 'var(--streamer2-color)';
+                        answerText2.style.fontWeight = '600';
+                    } else {
+                        answerText2.textContent = 'Noch keine Antwort';
+                        answerText2.style.color = 'var(--text-secondary)';
+                        answerText2.style.fontWeight = '400';
+                    }
+                }
+            } else {
+                hostLiveAnswers.style.display = 'none';
+            }
+        }
+
         // Update answers
         const answersGrid = document.getElementById('answers-grid');
         answersGrid.innerHTML = '';
@@ -781,30 +828,63 @@ function updateUI() {
             streamerView.style.display = 'none';
             hostView.style.display = 'block';
             
-            const result1 = gameState.answers.streamer1 === gameState.currentQuestion.correct;
-            const result2 = gameState.answers.streamer2 === gameState.currentQuestion.correct;
+            // Calculate results - check if answers match correct answer
+            const correctAnswer = gameState.currentQuestion.correct;
+            const answer1 = gameState.answers.streamer1;
+            const answer2 = gameState.answers.streamer2;
+            
+            const result1 = answer1 !== null && answer1 !== undefined && answer1 === correctAnswer;
+            const result2 = answer2 !== null && answer2 !== undefined && answer2 === correctAnswer;
+            
+            console.log('Host view - Evaluating answers:', {
+                correctAnswer: correctAnswer,
+                streamer1Answer: answer1,
+                streamer2Answer: answer2,
+                streamer1Correct: result1,
+                streamer2Correct: result2,
+                currentScores: gameState.scores
+            });
             
             // Update streamer 1 card
             const streamer1Card = document.getElementById('result-streamer1');
             const streamer1Status = document.getElementById('result-status-1');
-            streamer1Card.className = `result-streamer-card ${result1 ? 'correct' : 'incorrect'}`;
-            streamer1Status.className = `result-status ${result1 ? 'correct' : 'incorrect'}`;
-            streamer1Status.innerHTML = result1 ? 
-                '<i class="fas fa-check-circle"></i><span>Richtig</span>' : 
-                '<i class="fas fa-times-circle"></i><span>Falsch</span>';
+            if (streamer1Card && streamer1Status) {
+                streamer1Card.className = `result-streamer-card ${result1 ? 'correct' : 'incorrect'}`;
+                streamer1Status.className = `result-status ${result1 ? 'correct' : 'incorrect'}`;
+                if (answer1 === null || answer1 === undefined) {
+                    streamer1Status.innerHTML = '<i class="fas fa-question-circle"></i><span>Keine Antwort</span>';
+                    streamer1Card.className = 'result-streamer-card';
+                    streamer1Status.className = 'result-status';
+                } else {
+                    streamer1Status.innerHTML = result1 ? 
+                        '<i class="fas fa-check-circle"></i><span>Richtig</span>' : 
+                        '<i class="fas fa-times-circle"></i><span>Falsch</span>';
+                }
+            }
             
             // Update streamer 2 card
             const streamer2Card = document.getElementById('result-streamer2');
             const streamer2Status = document.getElementById('result-status-2');
-            streamer2Card.className = `result-streamer-card ${result2 ? 'correct' : 'incorrect'}`;
-            streamer2Status.className = `result-status ${result2 ? 'correct' : 'incorrect'}`;
-            streamer2Status.innerHTML = result2 ? 
-                '<i class="fas fa-check-circle"></i><span>Richtig</span>' : 
-                '<i class="fas fa-times-circle"></i><span>Falsch</span>';
+            if (streamer2Card && streamer2Status) {
+                streamer2Card.className = `result-streamer-card ${result2 ? 'correct' : 'incorrect'}`;
+                streamer2Status.className = `result-status ${result2 ? 'correct' : 'incorrect'}`;
+                if (answer2 === null || answer2 === undefined) {
+                    streamer2Status.innerHTML = '<i class="fas fa-question-circle"></i><span>Keine Antwort</span>';
+                    streamer2Card.className = 'result-streamer-card';
+                    streamer2Status.className = 'result-status';
+                } else {
+                    streamer2Status.innerHTML = result2 ? 
+                        '<i class="fas fa-check-circle"></i><span>Richtig</span>' : 
+                        '<i class="fas fa-times-circle"></i><span>Falsch</span>';
+                }
+            }
             
             // Show correct answer
             const correctAnswerLetter = String.fromCharCode(65 + gameState.currentQuestion.correct);
-            document.getElementById('correct-answer-display').textContent = correctAnswerLetter;
+            const correctAnswerDisplay = document.getElementById('correct-answer-display');
+            if (correctAnswerDisplay) {
+                correctAnswerDisplay.textContent = correctAnswerLetter;
+            }
         }
     }
 }
