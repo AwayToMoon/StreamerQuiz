@@ -1,8 +1,8 @@
 // Login Credentials
 const LOGIN_CREDENTIALS = {
-    host: 'Away2025',
-    streamer1: 'HigherCellF2025',
-    streamer2: 'OGAle_2025'
+    host: 'Away',
+    streamer1: 'Higher',
+    streamer2: 'OGAle'
 };
 
 // Custom Modal System
@@ -1220,4 +1220,5 @@ gameState.questions = [
         correct: 1
     }
 ];
+
 
