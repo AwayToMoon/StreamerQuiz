@@ -136,7 +136,6 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Firebase available:', !!window.db);
     
     initLogin();
-    initGame();
     listenToGameState();
     
     // Check Firebase connection after a short delay
@@ -1121,4 +1120,5 @@ gameState.questions = [
         correct: 1
     }
 ];
+
 
