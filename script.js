@@ -808,21 +808,60 @@ function updateUI() {
                          currentRole === 'streamer2' ? 'streamer2' : null;
         
         if (answerKey) {
-            // Streamer view
+            // Streamer view - use same design as host
             const streamerView = document.getElementById('result-streamer-view');
             const hostView = document.getElementById('result-host-view');
             streamerView.style.display = 'block';
             hostView.style.display = 'none';
             
-            const userAnswer = gameState.answers[answerKey];
-            const isCorrect = userAnswer === gameState.currentQuestion.correct;
+            // Calculate results for both streamers
+            const correctAnswer = gameState.currentQuestion.correct;
+            const answer1 = gameState.answers.streamer1;
+            const answer2 = gameState.answers.streamer2;
             
-            document.getElementById('result-icon').className = `result-icon ${isCorrect ? 'correct' : 'incorrect'}`;
-            document.getElementById('result-icon').className += ' fas ' + (isCorrect ? 'fa-check-circle' : 'fa-times-circle');
-            document.getElementById('result-text').textContent = isCorrect ? 'Richtig!' : 'Falsch!';
-            document.getElementById('result-explanation').textContent = isCorrect ? 
-                'Gut gemacht!' : 
-                `Die richtige Antwort war: ${String.fromCharCode(65 + gameState.currentQuestion.correct)}`;
+            const result1 = answer1 !== null && answer1 !== undefined && answer1 === correctAnswer;
+            const result2 = answer2 !== null && answer2 !== undefined && answer2 === correctAnswer;
+            
+            // Update streamer 1 card
+            const streamer1Card = document.getElementById('result-streamer-view-1');
+            const streamer1Status = document.getElementById('result-streamer-status-1');
+            if (streamer1Card && streamer1Status) {
+                streamer1Card.className = `result-streamer-card ${result1 ? 'correct' : 'incorrect'}`;
+                streamer1Status.className = `result-status ${result1 ? 'correct' : 'incorrect'}`;
+                if (answer1 === null || answer1 === undefined) {
+                    streamer1Status.innerHTML = '<i class="fas fa-question-circle"></i><span>Keine Antwort</span>';
+                    streamer1Card.className = 'result-streamer-card';
+                    streamer1Status.className = 'result-status';
+                } else {
+                    streamer1Status.innerHTML = result1 ? 
+                        '<i class="fas fa-check-circle"></i><span>Richtig</span>' : 
+                        '<i class="fas fa-times-circle"></i><span>Falsch</span>';
+                }
+            }
+            
+            // Update streamer 2 card
+            const streamer2Card = document.getElementById('result-streamer-view-2');
+            const streamer2Status = document.getElementById('result-streamer-status-2');
+            if (streamer2Card && streamer2Status) {
+                streamer2Card.className = `result-streamer-card ${result2 ? 'correct' : 'incorrect'}`;
+                streamer2Status.className = `result-status ${result2 ? 'correct' : 'incorrect'}`;
+                if (answer2 === null || answer2 === undefined) {
+                    streamer2Status.innerHTML = '<i class="fas fa-question-circle"></i><span>Keine Antwort</span>';
+                    streamer2Card.className = 'result-streamer-card';
+                    streamer2Status.className = 'result-status';
+                } else {
+                    streamer2Status.innerHTML = result2 ? 
+                        '<i class="fas fa-check-circle"></i><span>Richtig</span>' : 
+                        '<i class="fas fa-times-circle"></i><span>Falsch</span>';
+                }
+            }
+            
+            // Show correct answer
+            const correctAnswerLetter = String.fromCharCode(65 + gameState.currentQuestion.correct);
+            const correctAnswerDisplay = document.getElementById('result-streamer-correct-answer');
+            if (correctAnswerDisplay) {
+                correctAnswerDisplay.textContent = correctAnswerLetter;
+            }
         } else {
             // Host view
             const streamerView = document.getElementById('result-streamer-view');
@@ -1220,5 +1259,4 @@ gameState.questions = [
         correct: 1
     }
 ];
-
 
