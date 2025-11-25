@@ -216,8 +216,10 @@ function loginSuccess() {
         // For streamers: Load initial state from Firebase immediately
         if (window.db) {
             window.db.collection('quiz').doc('gameState').get().then((doc) => {
-                if (doc.exists()) {
-                    const data = doc.data();
+                // Get document data - in compat version, data() returns null if doc doesn't exist
+                const data = doc.data();
+                
+                if (data) {
                     console.log('Streamer: Loading initial state from Firebase');
                     
                     // Load questions if available
@@ -850,8 +852,10 @@ function listenToGameState() {
     console.log('Setting up Firebase listener for game state...');
 
     window.db.collection('quiz').doc('gameState').onSnapshot((doc) => {
-        if (doc.exists()) {
-            const data = doc.data();
+        // Get document data - in compat version, data() returns null if doc doesn't exist
+        const data = doc.data();
+        
+        if (data) {
             
             console.log('Firebase update received:', {
                 status: data.status,
@@ -959,7 +963,7 @@ function listenToGameState() {
             console.log('Updating UI after Firebase sync');
             updateUI();
         } else {
-            console.warn('Firebase document does not exist');
+            console.warn('Firebase document does not exist or has no data');
         }
     }, (error) => {
         console.error('Error listening to game state:', error);
@@ -1120,5 +1124,4 @@ gameState.questions = [
         correct: 1
     }
 ];
-
 
