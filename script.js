@@ -213,10 +213,52 @@ function loginSuccess() {
         document.getElementById('host-panel').style.display = 'none';
         // Show welcome modal for streamers only
         showWelcomeModalForStreamer();
+        
+        // For streamers: Load initial state from Firebase immediately
+        if (window.db) {
+            window.db.collection('quiz').doc('gameState').get().then((doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    console.log('Streamer: Loading initial state from Firebase');
+                    
+                    // Load questions if available
+                    if (data.questions && data.questions.length > 0) {
+                        gameState.questions = data.questions;
+                        console.log('Streamer: Loaded', data.questions.length, 'questions from Firebase');
+                    }
+                    
+                    // Load current state
+                    if (data.status) gameState.status = data.status;
+                    if (data.questionIndex !== undefined) gameState.questionIndex = data.questionIndex;
+                    if (data.round !== undefined) gameState.round = data.round;
+                    if (data.scores) gameState.scores = data.scores;
+                    if (data.currentQuestion) gameState.currentQuestion = data.currentQuestion;
+                    if (data.videoLinks) gameState.videoLinks = data.videoLinks;
+                    
+                    // Ensure currentQuestion is set if status is active
+                    if (gameState.status === 'active' && !gameState.currentQuestion) {
+                        if (gameState.questions && gameState.questions.length > 0) {
+                            if (gameState.questionIndex >= 0 && gameState.questionIndex < gameState.questions.length) {
+                                gameState.currentQuestion = gameState.questions[gameState.questionIndex];
+                            }
+                        }
+                    }
+                    
+                    updateUI();
+                    if (data.videoLinks) {
+                        loadVideos();
+                    }
+                }
+            }).catch((error) => {
+                console.error('Error loading initial state:', error);
+            });
+        }
     }
 
-    // Update Firebase with user login
-    updateGameState();
+    // Update Firebase with user login (only for host)
+    if (currentRole === 'host') {
+        updateGameState();
+    }
 }
 
 function showWelcomeModalForStreamer() {
@@ -623,13 +665,13 @@ function updateUI() {
         activeArea.style.display = 'block';
         resultArea.style.display = 'none';
 
-        // ALWAYS load question from local array first - this ensures question text is available
-        if (gameState.questions && gameState.questions.length > 0) {
-            if (gameState.questionIndex >= 0 && gameState.questionIndex < gameState.questions.length) {
-                const questionFromArray = gameState.questions[gameState.questionIndex];
-                if (questionFromArray && questionFromArray.question) {
-                    // Always use the question from the local array
-                    gameState.currentQuestion = questionFromArray;
+        // CRITICAL: Ensure currentQuestion is always set when status is active
+        if (!gameState.currentQuestion || !gameState.currentQuestion.question) {
+            // Try to load from questions array
+            if (gameState.questions && gameState.questions.length > 0) {
+                if (gameState.questionIndex >= 0 && gameState.questionIndex < gameState.questions.length) {
+                    gameState.currentQuestion = gameState.questions[gameState.questionIndex];
+                    console.log('updateUI: Loaded question from array, index:', gameState.questionIndex);
                 }
             }
         }
@@ -647,6 +689,13 @@ function updateUI() {
                 questionElement.textContent = gameState.currentQuestion.question;
             } else {
                 questionElement.textContent = 'Frage wird geladen...';
+                console.warn('updateUI: Question not available, attempting to load...', {
+                    hasQuestions: !!gameState.questions,
+                    questionsLength: gameState.questions?.length,
+                    questionIndex: gameState.questionIndex,
+                    hasCurrentQuestion: !!gameState.currentQuestion
+                });
+                
                 // Force reload if question is missing
                 if (gameState.questions && gameState.questions.length > 0 && gameState.questionIndex < gameState.questions.length) {
                     setTimeout(() => {
@@ -850,13 +899,16 @@ function listenToGameState() {
             const oldQuestionIndex = gameState.questionIndex;
             
             // Preserve questions array if it exists locally (should be same for all)
-            const localQuestions = gameState.questions && gameState.questions.length > 0 ? gameState.questions : null;
+            // Use Firebase questions if local ones don't exist
+            const questionsToUse = data.questions && data.questions.length > 0 
+                ? data.questions 
+                : (gameState.questions && gameState.questions.length > 0 ? gameState.questions : []);
             
             gameState = {
                 ...gameState,
                 ...data,
-                // Keep local questions if they exist (they should be the same)
-                questions: localQuestions || data.questions || gameState.questions,
+                // Use questions from Firebase if available, otherwise keep local
+                questions: questionsToUse,
                 // Preserve local answers until evaluated
                 answers: {
                     streamer1: data.answers?.streamer1 ?? gameState.answers.streamer1,
@@ -864,34 +916,37 @@ function listenToGameState() {
                 }
             };
 
+            // CRITICAL: Always ensure currentQuestion is set when status is active
+            if (gameState.status === 'active') {
+                // Priority 1: Use currentQuestion from Firebase if available
+                if (data.currentQuestion && data.currentQuestion.question) {
+                    gameState.currentQuestion = data.currentQuestion;
+                    console.log('Using currentQuestion from Firebase');
+                }
+                // Priority 2: Load from questions array using questionIndex
+                else if (gameState.questions && gameState.questions.length > 0) {
+                    if (gameState.questionIndex >= 0 && gameState.questionIndex < gameState.questions.length) {
+                        gameState.currentQuestion = gameState.questions[gameState.questionIndex];
+                        console.log('Loaded currentQuestion from questions array, index:', gameState.questionIndex);
+                    }
+                }
+                
+                // If still no question, log error
+                if (!gameState.currentQuestion || !gameState.currentQuestion.question) {
+                    console.error('CRITICAL: currentQuestion is missing!', {
+                        hasQuestions: !!gameState.questions,
+                        questionsLength: gameState.questions?.length,
+                        questionIndex: gameState.questionIndex,
+                        hasDataCurrentQuestion: !!data.currentQuestion
+                    });
+                }
+            }
+
             // If question changed, reset local answer
             if (oldQuestionIndex !== gameState.questionIndex) {
                 const answerKey = currentRole === 'streamer1' ? 'streamer1' : 'streamer2';
                 gameState.answers[answerKey] = null;
-            }
-
-            // If status changed to active, ensure question is loaded
-            if (oldStatus !== 'active' && gameState.status === 'active') {
-                // If currentQuestion is not set, load it from questions array
-                if (!gameState.currentQuestion && gameState.questions && gameState.questions.length > 0) {
-                    if (gameState.questionIndex < gameState.questions.length) {
-                        gameState.currentQuestion = gameState.questions[gameState.questionIndex];
-                    }
-                }
-            }
-            
-            // Also check if question index changed but status is already active
-            if (gameState.status === 'active' && oldQuestionIndex !== gameState.questionIndex) {
-                if (gameState.questions && gameState.questions.length > 0 && gameState.questionIndex < gameState.questions.length) {
-                    gameState.currentQuestion = gameState.questions[gameState.questionIndex];
-                }
-            }
-            
-            // Ensure currentQuestion is set if status is active but question is missing
-            if (gameState.status === 'active' && !gameState.currentQuestion) {
-                if (gameState.questions && gameState.questions.length > 0 && gameState.questionIndex < gameState.questions.length) {
-                    gameState.currentQuestion = gameState.questions[gameState.questionIndex];
-                }
+                console.log('Question index changed, reset answer for', answerKey);
             }
 
             // Load videos if changed
