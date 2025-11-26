@@ -330,6 +330,7 @@ function initHostControls() {
     const nextQuestionBtn = document.getElementById('next-question-btn');
     const resetQuizBtn = document.getElementById('reset-quiz-btn');
     const addQuestionBtn = document.getElementById('add-question-btn');
+    const manageQuestionsBtn = document.getElementById('manage-questions-btn');
 
     loadVideosBtn.addEventListener('click', () => {
         const link1 = document.getElementById('video-link-1').value.trim();
@@ -450,6 +451,148 @@ function initHostControls() {
 
         showModal('Erfolg', `Frage hinzugefügt!\n\n(${gameState.questions.length} Fragen insgesamt)`, 'success');
     });
+    
+    // Questions Manager
+    manageQuestionsBtn.addEventListener('click', () => {
+        openQuestionsManager();
+    });
+}
+
+// Questions Manager Functions
+function openQuestionsManager() {
+    const modal = document.getElementById('questions-manager-modal');
+    const closeBtn = document.getElementById('questions-manager-close-btn');
+    const closeBtn2 = document.getElementById('questions-manager-close');
+    
+    renderQuestionsList();
+    modal.classList.add('active');
+    
+    const closeModal = () => {
+        modal.classList.remove('active');
+    };
+    
+    closeBtn.onclick = closeModal;
+    closeBtn2.onclick = closeModal;
+    
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    };
+}
+
+function renderQuestionsList() {
+    const questionsList = document.getElementById('questions-list');
+    
+    if (!gameState.questions || gameState.questions.length === 0) {
+        questionsList.innerHTML = `
+            <div class="empty-questions">
+                <i class="fas fa-inbox"></i>
+                <p>Keine Fragen vorhanden</p>
+            </div>
+        `;
+        return;
+    }
+    
+    questionsList.innerHTML = gameState.questions.map((question, index) => {
+        const correctLetter = String.fromCharCode(65 + question.correct);
+        return `
+            <div class="question-item">
+                <div class="question-item-header">
+                    <span class="question-number">Frage ${index + 1}</span>
+                    <div class="question-actions">
+                        <button class="question-action-btn edit-btn" onclick="editQuestion(${index})">
+                            <i class="fas fa-edit"></i> Bearbeiten
+                        </button>
+                        <button class="question-action-btn delete-btn" onclick="deleteQuestion(${index})">
+                            <i class="fas fa-trash"></i> Löschen
+                        </button>
+                    </div>
+                </div>
+                <div class="question-text-display">${question.question}</div>
+                <div class="question-answers-display">
+                    ${question.answers.map((answer, i) => `
+                        <div class="answer-display ${i === question.correct ? 'correct' : ''}">
+                            ${String.fromCharCode(65 + i)}: ${answer}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function editQuestion(index) {
+    const modal = document.getElementById('edit-question-modal');
+    const question = gameState.questions[index];
+    
+    // Fill form with current values
+    document.getElementById('edit-question-text').value = question.question;
+    document.getElementById('edit-answer-0').value = question.answers[0];
+    document.getElementById('edit-answer-1').value = question.answers[1];
+    document.getElementById('edit-answer-2').value = question.answers[2];
+    document.getElementById('edit-answer-3').value = question.answers[3];
+    document.getElementById('edit-correct-answer').value = question.correct;
+    
+    modal.classList.add('active');
+    
+    const closeBtn = document.getElementById('edit-question-close-btn');
+    const cancelBtn = document.getElementById('edit-question-cancel');
+    const saveBtn = document.getElementById('edit-question-save');
+    
+    const closeModal = () => {
+        modal.classList.remove('active');
+    };
+    
+    closeBtn.onclick = closeModal;
+    cancelBtn.onclick = closeModal;
+    
+    saveBtn.onclick = () => {
+        const questionText = document.getElementById('edit-question-text').value.trim();
+        const answers = [
+            document.getElementById('edit-answer-0').value.trim(),
+            document.getElementById('edit-answer-1').value.trim(),
+            document.getElementById('edit-answer-2').value.trim(),
+            document.getElementById('edit-answer-3').value.trim()
+        ];
+        const correctAnswer = parseInt(document.getElementById('edit-correct-answer').value);
+        
+        if (!questionText || answers.some(a => !a)) {
+            showModal('Fehler', 'Bitte fülle alle Felder aus!', 'error');
+            return;
+        }
+        
+        // Update question
+        gameState.questions[index] = {
+            question: questionText,
+            answers: answers,
+            correct: correctAnswer
+        };
+        
+        updateGameState();
+        closeModal();
+        renderQuestionsList();
+        showModal('Erfolg', 'Frage wurde aktualisiert!', 'success');
+    };
+    
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    };
+}
+
+function deleteQuestion(index) {
+    showConfirmModal(
+        'Frage löschen',
+        `Möchtest du Frage ${index + 1} wirklich löschen?`,
+        () => {
+            gameState.questions.splice(index, 1);
+            updateGameState();
+            renderQuestionsList();
+            showModal('Erfolg', 'Frage wurde gelöscht!', 'success');
+        }
+    );
 }
 
 function loadVideos() {
