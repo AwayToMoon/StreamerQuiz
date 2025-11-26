@@ -5,6 +5,90 @@ const LOGIN_CREDENTIALS = {
     streamer2: 'OGAle_2025'
 };
 
+// Sound Manager
+class SoundManager {
+    constructor() {
+        this.audioContext = null;
+        this.sounds = {};
+        this.enabled = true;
+        this.volume = 0.3;
+    }
+
+    init() {
+        if (!this.audioContext) {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }
+
+    playTone(frequency, duration, type = 'sine', volume = this.volume) {
+        if (!this.enabled || !this.audioContext) return;
+
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+
+        oscillator.frequency.value = frequency;
+        oscillator.type = type;
+
+        gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+
+        oscillator.start(this.audioContext.currentTime);
+        oscillator.stop(this.audioContext.currentTime + duration);
+    }
+
+    click() {
+        this.playTone(800, 0.05, 'sine', 0.2);
+    }
+
+    success() {
+        const now = this.audioContext?.currentTime || 0;
+        this.playTone(523.25, 0.1, 'sine', 0.3);
+        setTimeout(() => this.playTone(659.25, 0.1, 'sine', 0.3), 100);
+        setTimeout(() => this.playTone(783.99, 0.15, 'sine', 0.3), 200);
+    }
+
+    error() {
+        this.playTone(200, 0.15, 'sawtooth', 0.25);
+        setTimeout(() => this.playTone(150, 0.2, 'sawtooth', 0.25), 100);
+    }
+
+    correct() {
+        this.playTone(880, 0.1, 'sine', 0.35);
+        setTimeout(() => this.playTone(1046.5, 0.15, 'sine', 0.35), 80);
+    }
+
+    wrong() {
+        this.playTone(300, 0.1, 'triangle', 0.3);
+        setTimeout(() => this.playTone(250, 0.15, 'triangle', 0.3), 100);
+    }
+
+    quizStart() {
+        const notes = [523.25, 587.33, 659.25, 783.99];
+        notes.forEach((note, i) => {
+            setTimeout(() => this.playTone(note, 0.12, 'sine', 0.3), i * 80);
+        });
+    }
+
+    notification() {
+        this.playTone(1000, 0.08, 'sine', 0.25);
+        setTimeout(() => this.playTone(1200, 0.08, 'sine', 0.25), 100);
+    }
+
+    tick() {
+        this.playTone(600, 0.03, 'sine', 0.15);
+    }
+
+    toggle() {
+        this.enabled = !this.enabled;
+        return this.enabled;
+    }
+}
+
+const soundManager = new SoundManager();
+
 // Custom Modal System
 function showModal(title, message, type = 'info', callback = null) {
     const modal = document.getElementById('custom-modal');
@@ -135,6 +219,9 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Initializing application...');
     console.log('Firebase available:', !!window.db);
     
+    // Initialize sound manager
+    soundManager.init();
+    
     initLogin();
     listenToGameState();
     
@@ -162,6 +249,7 @@ function initLogin() {
 
     loginOptions.forEach(option => {
         option.addEventListener('click', () => {
+            soundManager.click();
             const role = option.dataset.role;
             currentRole = role;
             
@@ -173,6 +261,7 @@ function initLogin() {
     });
 
     backBtn.addEventListener('click', () => {
+        soundManager.click();
         document.querySelector('.login-options').style.display = 'grid';
         loginForm.style.display = 'none';
         passwordInput.value = '';
@@ -190,8 +279,10 @@ function initLogin() {
         const expectedPassword = LOGIN_CREDENTIALS[currentRole];
 
         if (password === expectedPassword) {
+            soundManager.success();
             loginSuccess();
         } else {
+            soundManager.error();
             showModal('Fehler', 'Falsches Passwort!', 'error');
             passwordInput.value = '';
             passwordInput.focus();
@@ -310,9 +401,26 @@ function showWelcomeModalForStreamer() {
     document.addEventListener('keydown', escapeHandler);
 }
 
+// Sound Toggle
+document.getElementById('sound-toggle-btn').addEventListener('click', function() {
+    const isEnabled = soundManager.toggle();
+    const icon = this.querySelector('i');
+    
+    if (isEnabled) {
+        icon.className = 'fas fa-volume-up';
+        this.classList.remove('muted');
+        soundManager.notification();
+    } else {
+        icon.className = 'fas fa-volume-mute';
+        this.classList.add('muted');
+    }
+});
+
 // Logout
 document.getElementById('logout-btn').addEventListener('click', () => {
+    soundManager.click();
     showConfirmModal('Ausloggen', 'Möchtest du dich wirklich ausloggen?', () => {
+        soundManager.notification();
         currentUser = null;
         currentRole = null;
         document.getElementById('game-container').style.display = 'none';
@@ -333,6 +441,7 @@ function initHostControls() {
     const manageQuestionsBtn = document.getElementById('manage-questions-btn');
 
     loadVideosBtn.addEventListener('click', () => {
+        soundManager.click();
         const link1 = document.getElementById('video-link-1').value.trim();
         const link2 = document.getElementById('video-link-2').value.trim();
 
@@ -341,19 +450,24 @@ function initHostControls() {
             gameState.videoLinks.streamer2 = link2;
             loadVideos();
             updateGameState();
+            soundManager.success();
             showModal('Erfolg', 'Videos erfolgreich geladen!', 'success');
         } else {
+            soundManager.error();
             showModal('Fehler', 'Bitte beide Video-Links eingeben!', 'error');
         }
     });
 
     startQuizBtn.addEventListener('click', () => {
+        soundManager.click();
         if (gameState.questions.length === 0) {
+            soundManager.error();
             showModal('Fehler', 'Bitte füge zuerst Fragen hinzu!', 'error');
             return;
         }
         
         console.log('Starting quiz...');
+        soundManager.quizStart();
         
         gameState.status = 'active';
         gameState.questionIndex = 0;
@@ -389,6 +503,7 @@ function initHostControls() {
     const showAnswersBtn = document.getElementById('show-answers-btn');
     
     showAnswersBtn.addEventListener('click', () => {
+        soundManager.click();
         if (gameState.status === 'active' && gameState.currentQuestion) {
             evaluateAnswers();
             showAnswersBtn.disabled = true;
@@ -397,8 +512,10 @@ function initHostControls() {
     });
 
     nextQuestionBtn.addEventListener('click', () => {
+        soundManager.click();
         if (gameState.questionIndex < gameState.questions.length - 1) {
             console.log('Moving to next question...');
+            soundManager.notification();
             gameState.questionIndex++;
             gameState.round++;
             gameState.status = 'active';
@@ -420,17 +537,21 @@ function initHostControls() {
     });
 
     resetQuizBtn.addEventListener('click', () => {
+        soundManager.click();
         showConfirmModal('Quiz zurücksetzen', 'Möchtest du das Quiz wirklich zurücksetzen?', () => {
+            soundManager.notification();
             resetQuiz();
         });
     });
 
     addQuestionBtn.addEventListener('click', () => {
+        soundManager.click();
         const questionText = document.getElementById('question-text').value.trim();
         const answers = Array.from(document.querySelectorAll('.answer-input')).map(input => input.value.trim());
         const correctAnswer = parseInt(document.getElementById('correct-answer').value);
 
         if (!questionText || answers.some(a => !a)) {
+            soundManager.error();
             showModal('Fehler', 'Bitte fülle alle Felder aus!', 'error');
             return;
         }
@@ -449,11 +570,13 @@ function initHostControls() {
         document.querySelectorAll('.answer-input').forEach(input => input.value = '');
         document.getElementById('correct-answer').value = '0';
 
+        soundManager.success();
         showModal('Erfolg', `Frage hinzugefügt!\n\n(${gameState.questions.length} Fragen insgesamt)`, 'success');
     });
     
     // Questions Manager
     manageQuestionsBtn.addEventListener('click', () => {
+        soundManager.click();
         openQuestionsManager();
     });
 }
@@ -523,6 +646,7 @@ function renderQuestionsList() {
 }
 
 function editQuestion(index) {
+    soundManager.click();
     const modal = document.getElementById('edit-question-modal');
     const question = gameState.questions[index];
     
@@ -548,6 +672,7 @@ function editQuestion(index) {
     cancelBtn.onclick = closeModal;
     
     saveBtn.onclick = () => {
+        soundManager.click();
         const questionText = document.getElementById('edit-question-text').value.trim();
         const answers = [
             document.getElementById('edit-answer-0').value.trim(),
@@ -558,6 +683,7 @@ function editQuestion(index) {
         const correctAnswer = parseInt(document.getElementById('edit-correct-answer').value);
         
         if (!questionText || answers.some(a => !a)) {
+            soundManager.error();
             showModal('Fehler', 'Bitte fülle alle Felder aus!', 'error');
             return;
         }
@@ -572,6 +698,7 @@ function editQuestion(index) {
         updateGameState();
         closeModal();
         renderQuestionsList();
+        soundManager.success();
         showModal('Erfolg', 'Frage wurde aktualisiert!', 'success');
     };
     
@@ -583,6 +710,7 @@ function editQuestion(index) {
 }
 
 function deleteQuestion(index) {
+    soundManager.click();
     showConfirmModal(
         'Frage löschen',
         `Möchtest du Frage ${index + 1} wirklich löschen?`,
@@ -590,6 +718,7 @@ function deleteQuestion(index) {
             gameState.questions.splice(index, 1);
             updateGameState();
             renderQuestionsList();
+            soundManager.success();
             showModal('Erfolg', 'Frage wurde gelöscht!', 'success');
         }
     );
@@ -751,14 +880,41 @@ function evaluateAnswers() {
         currentScores: { ...gameState.scores }
     });
 
+    // Track if any correct answers for sound
+    let hasCorrect = false;
+    let hasWrong = false;
+
     // Update scores - only if answer is not null/undefined and matches correct answer
-    if (answer1 !== null && answer1 !== undefined && answer1 === correctAnswer) {
-        gameState.scores.streamer1++;
-        console.log('Streamer1 scored! New score:', gameState.scores.streamer1);
+    if (answer1 !== null && answer1 !== undefined) {
+        if (answer1 === correctAnswer) {
+            gameState.scores.streamer1++;
+            hasCorrect = true;
+            console.log('Streamer1 scored! New score:', gameState.scores.streamer1);
+        } else {
+            hasWrong = true;
+        }
     }
-    if (answer2 !== null && answer2 !== undefined && answer2 === correctAnswer) {
-        gameState.scores.streamer2++;
-        console.log('Streamer2 scored! New score:', gameState.scores.streamer2);
+    
+    if (answer2 !== null && answer2 !== undefined) {
+        if (answer2 === correctAnswer) {
+            gameState.scores.streamer2++;
+            hasCorrect = true;
+            console.log('Streamer2 scored! New score:', gameState.scores.streamer2);
+        } else {
+            hasWrong = true;
+        }
+    }
+
+    // Play sound based on results
+    if (hasCorrect && hasWrong) {
+        // Mixed results - play notification
+        soundManager.notification();
+    } else if (hasCorrect) {
+        // All correct
+        soundManager.correct();
+    } else if (hasWrong) {
+        // All wrong
+        soundManager.wrong();
     }
 
     console.log('Final scores after evaluation:', gameState.scores);
@@ -770,6 +926,8 @@ function evaluateAnswers() {
 
 // Answer Submission (for streamers)
 function submitAnswer(answerIndex) {
+    soundManager.click();
+    
     if (currentRole === 'host') {
         showModal('Info', 'Als Host kannst du keine Antworten abgeben!', 'info');
         return;
