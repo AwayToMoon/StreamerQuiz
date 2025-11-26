@@ -120,6 +120,9 @@
                         <button class="control-btn" id="reset-quiz-btn">
                             <i class="fas fa-redo"></i> Quiz zurücksetzen
                         </button>
+                        <button class="control-btn" id="manage-questions-btn" style="background: linear-gradient(135deg, var(--warning-color), #d97706);">
+                            <i class="fas fa-list"></i> Fragen verwalten
+                        </button>
                     </div>
                 </div>
                 <div class="control-group">
@@ -376,6 +379,62 @@
             </div>
             <div class="custom-modal-footer">
                 <button class="custom-modal-btn" id="modal-ok-btn">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Questions Manager Modal -->
+    <div id="questions-manager-modal" class="custom-modal">
+        <div class="custom-modal-content questions-manager-content">
+            <div class="custom-modal-header">
+                <h3 id="questions-manager-title"><i class="fas fa-list"></i> Fragen verwalten</h3>
+                <button class="custom-modal-close" id="questions-manager-close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="custom-modal-body questions-manager-body">
+                <div id="questions-list" class="questions-list">
+                    <!-- Questions will be dynamically inserted here -->
+                </div>
+            </div>
+            <div class="custom-modal-footer">
+                <button class="custom-modal-btn" id="questions-manager-close">Schließen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Question Modal -->
+    <div id="edit-question-modal" class="custom-modal">
+        <div class="custom-modal-content">
+            <div class="custom-modal-header">
+                <h3><i class="fas fa-edit"></i> Frage bearbeiten</h3>
+                <button class="custom-modal-close" id="edit-question-close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="custom-modal-body">
+                <div class="edit-question-form">
+                    <label>Frage:</label>
+                    <input type="text" id="edit-question-text" class="question-input" placeholder="Frage...">
+                    <label>Antworten:</label>
+                    <div class="answers-inputs">
+                        <input type="text" id="edit-answer-0" class="answer-input" placeholder="Antwort A...">
+                        <input type="text" id="edit-answer-1" class="answer-input" placeholder="Antwort B...">
+                        <input type="text" id="edit-answer-2" class="answer-input" placeholder="Antwort C...">
+                        <input type="text" id="edit-answer-3" class="answer-input" placeholder="Antwort D...">
+                    </div>
+                    <label>Richtige Antwort:</label>
+                    <select id="edit-correct-answer" class="correct-answer-select">
+                        <option value="0">A ist richtig</option>
+                        <option value="1">B ist richtig</option>
+                        <option value="2">C ist richtig</option>
+                        <option value="3">D ist richtig</option>
+                    </select>
+                </div>
+            </div>
+            <div class="custom-modal-footer">
+                <button class="custom-modal-btn" id="edit-question-cancel" style="background: var(--dark-border);">Abbrechen</button>
+                <button class="custom-modal-btn" id="edit-question-save" style="background: linear-gradient(135deg, var(--success-color), #059669);">Speichern</button>
             </div>
         </div>
     </div>
