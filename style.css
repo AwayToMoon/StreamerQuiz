@@ -385,6 +385,29 @@ body {
     border: 1px solid var(--dark-border);
 }
 
+.sound-toggle-btn {
+    background: var(--dark-bg);
+    border: 2px solid var(--dark-border);
+    color: var(--text-primary);
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-right: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sound-toggle-btn:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+}
+
+.sound-toggle-btn.muted {
+    opacity: 0.5;
+}
+
 .logout-btn {
     background: var(--danger-color);
     border: none;
