@@ -5,90 +5,6 @@ const LOGIN_CREDENTIALS = {
     streamer2: 'OGAle_2025'
 };
 
-// Sound Manager
-class SoundManager {
-    constructor() {
-        this.audioContext = null;
-        this.sounds = {};
-        this.enabled = true;
-        this.volume = 0.3;
-    }
-
-    init() {
-        if (!this.audioContext) {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-    }
-
-    playTone(frequency, duration, type = 'sine', volume = this.volume) {
-        if (!this.enabled || !this.audioContext) return;
-
-        const oscillator = this.audioContext.createOscillator();
-        const gainNode = this.audioContext.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(this.audioContext.destination);
-
-        oscillator.frequency.value = frequency;
-        oscillator.type = type;
-
-        gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
-
-        oscillator.start(this.audioContext.currentTime);
-        oscillator.stop(this.audioContext.currentTime + duration);
-    }
-
-    click() {
-        this.playTone(800, 0.05, 'sine', 0.2);
-    }
-
-    success() {
-        const now = this.audioContext?.currentTime || 0;
-        this.playTone(523.25, 0.1, 'sine', 0.3);
-        setTimeout(() => this.playTone(659.25, 0.1, 'sine', 0.3), 100);
-        setTimeout(() => this.playTone(783.99, 0.15, 'sine', 0.3), 200);
-    }
-
-    error() {
-        this.playTone(200, 0.15, 'sawtooth', 0.25);
-        setTimeout(() => this.playTone(150, 0.2, 'sawtooth', 0.25), 100);
-    }
-
-    correct() {
-        this.playTone(880, 0.1, 'sine', 0.35);
-        setTimeout(() => this.playTone(1046.5, 0.15, 'sine', 0.35), 80);
-    }
-
-    wrong() {
-        this.playTone(300, 0.1, 'triangle', 0.3);
-        setTimeout(() => this.playTone(250, 0.15, 'triangle', 0.3), 100);
-    }
-
-    quizStart() {
-        const notes = [523.25, 587.33, 659.25, 783.99];
-        notes.forEach((note, i) => {
-            setTimeout(() => this.playTone(note, 0.12, 'sine', 0.3), i * 80);
-        });
-    }
-
-    notification() {
-        this.playTone(1000, 0.08, 'sine', 0.25);
-        setTimeout(() => this.playTone(1200, 0.08, 'sine', 0.25), 100);
-    }
-
-    tick() {
-        this.playTone(600, 0.03, 'sine', 0.15);
-    }
-
-    toggle() {
-        this.enabled = !this.enabled;
-        return this.enabled;
-    }
-}
-
-const soundManager = new SoundManager();
-
 // Custom Modal System
 function showModal(title, message, type = 'info', callback = null) {
     const modal = document.getElementById('custom-modal');
@@ -219,14 +135,8 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Initializing application...');
     console.log('Firebase available:', !!window.db);
     
-    // Initialize sound manager
-    soundManager.init();
-    
     initLogin();
     listenToGameState();
-    
-    // Initialize default questions in Firebase immediately
-    initializeDefaultQuestions();
     
     // Check Firebase connection after a short delay
     setTimeout(() => {
@@ -249,7 +159,6 @@ function initLogin() {
 
     loginOptions.forEach(option => {
         option.addEventListener('click', () => {
-            soundManager.click();
             const role = option.dataset.role;
             currentRole = role;
             
@@ -261,7 +170,6 @@ function initLogin() {
     });
 
     backBtn.addEventListener('click', () => {
-        soundManager.click();
         document.querySelector('.login-options').style.display = 'grid';
         loginForm.style.display = 'none';
         passwordInput.value = '';
@@ -279,10 +187,8 @@ function initLogin() {
         const expectedPassword = LOGIN_CREDENTIALS[currentRole];
 
         if (password === expectedPassword) {
-            soundManager.success();
             loginSuccess();
         } else {
-            soundManager.error();
             showModal('Fehler', 'Falsches Passwort!', 'error');
             passwordInput.value = '';
             passwordInput.focus();
@@ -401,26 +307,9 @@ function showWelcomeModalForStreamer() {
     document.addEventListener('keydown', escapeHandler);
 }
 
-// Sound Toggle
-document.getElementById('sound-toggle-btn').addEventListener('click', function() {
-    const isEnabled = soundManager.toggle();
-    const icon = this.querySelector('i');
-    
-    if (isEnabled) {
-        icon.className = 'fas fa-volume-up';
-        this.classList.remove('muted');
-        soundManager.notification();
-    } else {
-        icon.className = 'fas fa-volume-mute';
-        this.classList.add('muted');
-    }
-});
-
 // Logout
 document.getElementById('logout-btn').addEventListener('click', () => {
-    soundManager.click();
     showConfirmModal('Ausloggen', 'Möchtest du dich wirklich ausloggen?', () => {
-        soundManager.notification();
         currentUser = null;
         currentRole = null;
         document.getElementById('game-container').style.display = 'none';
@@ -438,10 +327,8 @@ function initHostControls() {
     const nextQuestionBtn = document.getElementById('next-question-btn');
     const resetQuizBtn = document.getElementById('reset-quiz-btn');
     const addQuestionBtn = document.getElementById('add-question-btn');
-    const manageQuestionsBtn = document.getElementById('manage-questions-btn');
 
     loadVideosBtn.addEventListener('click', () => {
-        soundManager.click();
         const link1 = document.getElementById('video-link-1').value.trim();
         const link2 = document.getElementById('video-link-2').value.trim();
 
@@ -450,24 +337,19 @@ function initHostControls() {
             gameState.videoLinks.streamer2 = link2;
             loadVideos();
             updateGameState();
-            soundManager.success();
             showModal('Erfolg', 'Videos erfolgreich geladen!', 'success');
         } else {
-            soundManager.error();
             showModal('Fehler', 'Bitte beide Video-Links eingeben!', 'error');
         }
     });
 
     startQuizBtn.addEventListener('click', () => {
-        soundManager.click();
         if (gameState.questions.length === 0) {
-            soundManager.error();
             showModal('Fehler', 'Bitte füge zuerst Fragen hinzu!', 'error');
             return;
         }
         
         console.log('Starting quiz...');
-        soundManager.quizStart();
         
         gameState.status = 'active';
         gameState.questionIndex = 0;
@@ -480,12 +362,14 @@ function initHostControls() {
         // Ensure currentQuestion is set before updating - use index 0 explicitly
         if (gameState.questions && gameState.questions.length > 0) {
             gameState.currentQuestion = gameState.questions[0];
+            console.log('Set currentQuestion:', {
+                hasQuestion: !!gameState.currentQuestion,
+                questionText: gameState.currentQuestion?.question?.substring(0, 50),
+                hasAnswers: !!gameState.currentQuestion?.answers
+            });
         }
         
-        // Update Firebase first, then UI
-        updateGameState();
-        
-        // Also call loadQuestion to ensure everything is set up
+        // Load question first to ensure everything is set up properly
         loadQuestion();
         
         // Update button states
@@ -496,14 +380,15 @@ function initHostControls() {
         console.log('Quiz started, state:', {
             status: gameState.status,
             questionIndex: gameState.questionIndex,
-            round: gameState.round
+            round: gameState.round,
+            hasCurrentQuestion: !!gameState.currentQuestion,
+            questionText: gameState.currentQuestion?.question?.substring(0, 50)
         });
     });
 
     const showAnswersBtn = document.getElementById('show-answers-btn');
     
     showAnswersBtn.addEventListener('click', () => {
-        soundManager.click();
         if (gameState.status === 'active' && gameState.currentQuestion) {
             evaluateAnswers();
             showAnswersBtn.disabled = true;
@@ -512,10 +397,8 @@ function initHostControls() {
     });
 
     nextQuestionBtn.addEventListener('click', () => {
-        soundManager.click();
         if (gameState.questionIndex < gameState.questions.length - 1) {
             console.log('Moving to next question...');
-            soundManager.notification();
             gameState.questionIndex++;
             gameState.round++;
             gameState.status = 'active';
@@ -537,21 +420,17 @@ function initHostControls() {
     });
 
     resetQuizBtn.addEventListener('click', () => {
-        soundManager.click();
         showConfirmModal('Quiz zurücksetzen', 'Möchtest du das Quiz wirklich zurücksetzen?', () => {
-            soundManager.notification();
             resetQuiz();
         });
     });
 
     addQuestionBtn.addEventListener('click', () => {
-        soundManager.click();
         const questionText = document.getElementById('question-text').value.trim();
         const answers = Array.from(document.querySelectorAll('.answer-input')).map(input => input.value.trim());
         const correctAnswer = parseInt(document.getElementById('correct-answer').value);
 
         if (!questionText || answers.some(a => !a)) {
-            soundManager.error();
             showModal('Fehler', 'Bitte fülle alle Felder aus!', 'error');
             return;
         }
@@ -570,158 +449,8 @@ function initHostControls() {
         document.querySelectorAll('.answer-input').forEach(input => input.value = '');
         document.getElementById('correct-answer').value = '0';
 
-        soundManager.success();
         showModal('Erfolg', `Frage hinzugefügt!\n\n(${gameState.questions.length} Fragen insgesamt)`, 'success');
     });
-    
-    // Questions Manager
-    manageQuestionsBtn.addEventListener('click', () => {
-        soundManager.click();
-        openQuestionsManager();
-    });
-}
-
-// Questions Manager Functions
-function openQuestionsManager() {
-    const modal = document.getElementById('questions-manager-modal');
-    const closeBtn = document.getElementById('questions-manager-close-btn');
-    const closeBtn2 = document.getElementById('questions-manager-close');
-    
-    renderQuestionsList();
-    modal.classList.add('active');
-    
-    const closeModal = () => {
-        modal.classList.remove('active');
-    };
-    
-    closeBtn.onclick = closeModal;
-    closeBtn2.onclick = closeModal;
-    
-    modal.onclick = (e) => {
-        if (e.target === modal) {
-            closeModal();
-        }
-    };
-}
-
-function renderQuestionsList() {
-    const questionsList = document.getElementById('questions-list');
-    
-    if (!gameState.questions || gameState.questions.length === 0) {
-        questionsList.innerHTML = `
-            <div class="empty-questions">
-                <i class="fas fa-inbox"></i>
-                <p>Keine Fragen vorhanden</p>
-            </div>
-        `;
-        return;
-    }
-    
-    questionsList.innerHTML = gameState.questions.map((question, index) => {
-        const correctLetter = String.fromCharCode(65 + question.correct);
-        return `
-            <div class="question-item">
-                <div class="question-item-header">
-                    <span class="question-number">Frage ${index + 1}</span>
-                    <div class="question-actions">
-                        <button class="question-action-btn edit-btn" onclick="editQuestion(${index})">
-                            <i class="fas fa-edit"></i> Bearbeiten
-                        </button>
-                        <button class="question-action-btn delete-btn" onclick="deleteQuestion(${index})">
-                            <i class="fas fa-trash"></i> Löschen
-                        </button>
-                    </div>
-                </div>
-                <div class="question-text-display">${question.question}</div>
-                <div class="question-answers-display">
-                    ${question.answers.map((answer, i) => `
-                        <div class="answer-display ${i === question.correct ? 'correct' : ''}">
-                            ${String.fromCharCode(65 + i)}: ${answer}
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-function editQuestion(index) {
-    soundManager.click();
-    const modal = document.getElementById('edit-question-modal');
-    const question = gameState.questions[index];
-    
-    // Fill form with current values
-    document.getElementById('edit-question-text').value = question.question;
-    document.getElementById('edit-answer-0').value = question.answers[0];
-    document.getElementById('edit-answer-1').value = question.answers[1];
-    document.getElementById('edit-answer-2').value = question.answers[2];
-    document.getElementById('edit-answer-3').value = question.answers[3];
-    document.getElementById('edit-correct-answer').value = question.correct;
-    
-    modal.classList.add('active');
-    
-    const closeBtn = document.getElementById('edit-question-close-btn');
-    const cancelBtn = document.getElementById('edit-question-cancel');
-    const saveBtn = document.getElementById('edit-question-save');
-    
-    const closeModal = () => {
-        modal.classList.remove('active');
-    };
-    
-    closeBtn.onclick = closeModal;
-    cancelBtn.onclick = closeModal;
-    
-    saveBtn.onclick = () => {
-        soundManager.click();
-        const questionText = document.getElementById('edit-question-text').value.trim();
-        const answers = [
-            document.getElementById('edit-answer-0').value.trim(),
-            document.getElementById('edit-answer-1').value.trim(),
-            document.getElementById('edit-answer-2').value.trim(),
-            document.getElementById('edit-answer-3').value.trim()
-        ];
-        const correctAnswer = parseInt(document.getElementById('edit-correct-answer').value);
-        
-        if (!questionText || answers.some(a => !a)) {
-            soundManager.error();
-            showModal('Fehler', 'Bitte fülle alle Felder aus!', 'error');
-            return;
-        }
-        
-        // Update question
-        gameState.questions[index] = {
-            question: questionText,
-            answers: answers,
-            correct: correctAnswer
-        };
-        
-        updateGameState();
-        closeModal();
-        renderQuestionsList();
-        soundManager.success();
-        showModal('Erfolg', 'Frage wurde aktualisiert!', 'success');
-    };
-    
-    modal.onclick = (e) => {
-        if (e.target === modal) {
-            closeModal();
-        }
-    };
-}
-
-function deleteQuestion(index) {
-    soundManager.click();
-    showConfirmModal(
-        'Frage löschen',
-        `Möchtest du Frage ${index + 1} wirklich löschen?`,
-        () => {
-            gameState.questions.splice(index, 1);
-            updateGameState();
-            renderQuestionsList();
-            soundManager.success();
-            showModal('Erfolg', 'Frage wurde gelöscht!', 'success');
-        }
-    );
 }
 
 function loadVideos() {
@@ -833,39 +562,45 @@ function resetQuiz() {
 
 // Game Logic
 function loadQuestion() {
-    if (gameState.questionIndex >= gameState.questions.length) {
-        console.warn('Question index out of bounds');
+    if (!gameState.questions || gameState.questions.length === 0) {
+        console.error('No questions available');
         return;
     }
 
-    if (gameState.questions && gameState.questions.length > 0 && gameState.questionIndex < gameState.questions.length) {
-        // Always load question from array to ensure it's correct
-        gameState.currentQuestion = gameState.questions[gameState.questionIndex];
-        
-        // Reset answers ONLY if we are the host
-        // Streamers will have their answers reset via Firebase listener when question changes
-        if (currentRole === 'host') {
-            gameState.answers.streamer1 = null;
-            gameState.answers.streamer2 = null;
-        }
-
-        console.log('Loading question:', {
-            index: gameState.questionIndex,
-            question: gameState.currentQuestion.question.substring(0, 50) + '...',
-            role: currentRole
-        });
-
-        // Update UI first to show question immediately
-        updateUI();
-        // Then sync to Firebase
-        updateGameState();
-    } else {
-        console.error('Cannot load question - questions array issue:', {
-            hasQuestions: !!gameState.questions,
-            questionsLength: gameState.questions?.length,
-            questionIndex: gameState.questionIndex
-        });
+    if (gameState.questionIndex >= gameState.questions.length) {
+        console.warn('Question index out of bounds:', gameState.questionIndex, 'of', gameState.questions.length);
+        return;
     }
+
+    if (gameState.questionIndex < 0) {
+        console.warn('Question index is negative:', gameState.questionIndex);
+        return;
+    }
+
+    // Always load question from array to ensure it's correct
+    const questionToLoad = gameState.questions[gameState.questionIndex];
+    
+    if (!questionToLoad) {
+        console.error('Question at index', gameState.questionIndex, 'does not exist');
+        return;
+    }
+
+    gameState.currentQuestion = questionToLoad;
+    gameState.answers.streamer1 = null;
+    gameState.answers.streamer2 = null;
+
+    console.log('Loading question:', {
+        index: gameState.questionIndex,
+        hasQuestion: !!gameState.currentQuestion,
+        questionText: gameState.currentQuestion?.question?.substring(0, 50) + '...',
+        hasAnswers: !!gameState.currentQuestion?.answers,
+        answersCount: gameState.currentQuestion?.answers?.length
+    });
+
+    // Update UI first to show question immediately
+    updateUI();
+    // Then sync to Firebase
+    updateGameState();
 }
 
 function evaluateAnswers() {
@@ -880,41 +615,14 @@ function evaluateAnswers() {
         currentScores: { ...gameState.scores }
     });
 
-    // Track if any correct answers for sound
-    let hasCorrect = false;
-    let hasWrong = false;
-
     // Update scores - only if answer is not null/undefined and matches correct answer
-    if (answer1 !== null && answer1 !== undefined) {
-        if (answer1 === correctAnswer) {
-            gameState.scores.streamer1++;
-            hasCorrect = true;
-            console.log('Streamer1 scored! New score:', gameState.scores.streamer1);
-        } else {
-            hasWrong = true;
-        }
+    if (answer1 !== null && answer1 !== undefined && answer1 === correctAnswer) {
+        gameState.scores.streamer1++;
+        console.log('Streamer1 scored! New score:', gameState.scores.streamer1);
     }
-    
-    if (answer2 !== null && answer2 !== undefined) {
-        if (answer2 === correctAnswer) {
-            gameState.scores.streamer2++;
-            hasCorrect = true;
-            console.log('Streamer2 scored! New score:', gameState.scores.streamer2);
-        } else {
-            hasWrong = true;
-        }
-    }
-
-    // Play sound based on results
-    if (hasCorrect && hasWrong) {
-        // Mixed results - play notification
-        soundManager.notification();
-    } else if (hasCorrect) {
-        // All correct
-        soundManager.correct();
-    } else if (hasWrong) {
-        // All wrong
-        soundManager.wrong();
+    if (answer2 !== null && answer2 !== undefined && answer2 === correctAnswer) {
+        gameState.scores.streamer2++;
+        console.log('Streamer2 scored! New score:', gameState.scores.streamer2);
     }
 
     console.log('Final scores after evaluation:', gameState.scores);
@@ -926,8 +634,6 @@ function evaluateAnswers() {
 
 // Answer Submission (for streamers)
 function submitAnswer(answerIndex) {
-    soundManager.click();
-    
     if (currentRole === 'host') {
         showModal('Info', 'Als Host kannst du keine Antworten abgeben!', 'info');
         return;
@@ -1001,25 +707,36 @@ function updateUI() {
         }
         
         if (questionElement) {
+            // Try to ensure currentQuestion is set
+            if (!gameState.currentQuestion && gameState.questions && gameState.questions.length > 0) {
+                if (gameState.questionIndex >= 0 && gameState.questionIndex < gameState.questions.length) {
+                    gameState.currentQuestion = gameState.questions[gameState.questionIndex];
+                    console.log('updateUI: Loaded question from array, index:', gameState.questionIndex);
+                }
+            }
+            
             if (gameState.currentQuestion && gameState.currentQuestion.question) {
                 questionElement.textContent = gameState.currentQuestion.question;
+                console.log('updateUI: Question text set:', gameState.currentQuestion.question.substring(0, 50));
             } else {
                 questionElement.textContent = 'Frage wird geladen...';
                 console.warn('updateUI: Question not available, attempting to load...', {
                     hasQuestions: !!gameState.questions,
                     questionsLength: gameState.questions?.length,
                     questionIndex: gameState.questionIndex,
-                    hasCurrentQuestion: !!gameState.currentQuestion
+                    hasCurrentQuestion: !!gameState.currentQuestion,
+                    currentQuestionKeys: gameState.currentQuestion ? Object.keys(gameState.currentQuestion) : null
                 });
                 
                 // Force reload if question is missing
-                if (gameState.questions && gameState.questions.length > 0 && gameState.questionIndex < gameState.questions.length) {
-                    setTimeout(() => {
-                        if (gameState.questions[gameState.questionIndex]) {
-                            gameState.currentQuestion = gameState.questions[gameState.questionIndex];
-                            updateUI();
-                        }
-                    }, 100);
+                if (gameState.questions && gameState.questions.length > 0 && gameState.questionIndex >= 0 && gameState.questionIndex < gameState.questions.length) {
+                    const questionToLoad = gameState.questions[gameState.questionIndex];
+                    if (questionToLoad) {
+                        gameState.currentQuestion = questionToLoad;
+                        console.log('updateUI: Force loaded question:', questionToLoad.question?.substring(0, 50));
+                        // Update immediately without setTimeout
+                        questionElement.textContent = questionToLoad.question || 'Frage wird geladen...';
+                    }
                 }
             }
         }
@@ -1352,35 +1069,17 @@ function listenToGameState() {
                 ? data.questions 
                 : (gameState.questions && gameState.questions.length > 0 ? gameState.questions : []);
             
-            // Determine which answer key belongs to this streamer
-            const myAnswerKey = currentRole === 'streamer1' ? 'streamer1' : 'streamer2';
-            const otherAnswerKey = currentRole === 'streamer1' ? 'streamer2' : 'streamer1';
-            
-            // CRITICAL FIX: Preserve this streamer's local answer unless question changed
-            // Only sync the OTHER streamer's answer from Firebase
-            const shouldResetMyAnswer = oldQuestionIndex !== data.questionIndex || 
-                                       oldStatus === 'waiting' && data.status === 'active' ||
-                                       data.status === 'waiting';
-            
             gameState = {
                 ...gameState,
                 ...data,
                 // Use questions from Firebase if available, otherwise keep local
                 questions: questionsToUse,
-                // Preserve local answer for this streamer, but sync other streamer's answer
+                // Preserve local answers until evaluated
                 answers: {
-                    [myAnswerKey]: shouldResetMyAnswer ? null : gameState.answers[myAnswerKey],
-                    [otherAnswerKey]: data.answers?.[otherAnswerKey] ?? null
+                    streamer1: data.answers?.streamer1 ?? gameState.answers.streamer1,
+                    streamer2: data.answers?.streamer2 ?? gameState.answers.streamer2
                 }
             };
-
-            console.log('Streamer Firebase update:', {
-                role: currentRole,
-                myAnswer: gameState.answers[myAnswerKey],
-                otherAnswer: gameState.answers[otherAnswerKey],
-                questionChanged: oldQuestionIndex !== data.questionIndex,
-                shouldReset: shouldResetMyAnswer
-            });
 
             // CRITICAL: Always ensure currentQuestion is set when status is active
             if (gameState.status === 'active') {
@@ -1408,6 +1107,13 @@ function listenToGameState() {
                 }
             }
 
+            // If question changed, reset local answer
+            if (oldQuestionIndex !== gameState.questionIndex) {
+                const answerKey = currentRole === 'streamer1' ? 'streamer1' : 'streamer2';
+                gameState.answers[answerKey] = null;
+                console.log('Question index changed, reset answer for', answerKey);
+            }
+
             // Load videos if changed
             if (data.videoLinks && 
                 (data.videoLinks.streamer1 !== gameState.videoLinks.streamer1 ||
@@ -1427,39 +1133,8 @@ function listenToGameState() {
     });
 }
 
-// Initialize default questions in Firebase
-function initializeDefaultQuestions() {
-    if (!window.db) {
-        console.log('Firebase not available, using local questions only');
-        return;
-    }
-    
-    window.db.collection('quiz').doc('gameState').get().then((doc) => {
-        const data = doc.data();
-        // If Firebase has no questions or fewer questions, update it with defaults
-        if (!data || !data.questions || data.questions.length === 0) {
-            console.log('Initializing Firebase with default questions...');
-            window.db.collection('quiz').doc('gameState').set({
-                ...gameState,
-                questions: defaultQuestions,
-                lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true }).then(() => {
-                console.log('Default questions synced to Firebase successfully');
-                gameState.questions = [...defaultQuestions];
-            }).catch(error => {
-                console.error('Error syncing default questions:', error);
-            });
-        } else {
-            console.log('Firebase already has questions, loading them...');
-            gameState.questions = data.questions;
-        }
-    }).catch(error => {
-        console.error('Error checking Firebase questions:', error);
-    });
-}
-
 // Initialize default questions - 30 Schwierige Anime Fragen (jeweils aus einem anderen Anime)
-const defaultQuestions = [
+gameState.questions = [
     {
         question: "Wie heißt der Stand von Jotaro Kujo in 'JoJo's Bizarre Adventure: Stardust Crusaders'?",
         answers: ["Star Platinum", "The World", "Hierophant Green", "Silver Chariot"],
@@ -1611,7 +1286,4 @@ const defaultQuestions = [
         correct: 1
     }
 ];
-
-// Initialize questions in gameState
-gameState.questions = [...defaultQuestions];
 
