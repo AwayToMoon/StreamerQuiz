@@ -1682,23 +1682,29 @@ Antworte NUR mit einem JSON-Array im folgenden Format:
 Wichtig: correct ist der Index (0-3) der richtigen Antwort. Antworte NUR mit dem JSON-Array, keine zusätzlichen Erklärungen.`;
 
     // Try multiple free APIs in order
-    // If API key is provided, try paid APIs first (better quality)
-    // Otherwise, use free APIs
+    // API key is assumed to be Gemini key (starts with AIza)
     const apis = [];
     
-    if (apiKey) {
-        // If API key provided, try Gemini and OpenAI first
+    // Check if API key is Gemini key (starts with AIza) or OpenAI key
+    const isGeminiKey = apiKey && apiKey.startsWith('AIza');
+    const isOpenAIKey = apiKey && apiKey.startsWith('sk-');
+    
+    if (isGeminiKey) {
+        // Gemini API key provided
         apis.push(
-            { name: 'Google Gemini', fn: () => tryGeminiAPI(category, count, apiKey) },
-            { name: 'OpenAI', fn: () => tryOpenAIAPI(category, count, apiKey) },
-            { name: 'Hugging Face', fn: () => tryHuggingFaceAPI(category, count) }
+            { name: 'Google Gemini', fn: () => tryGeminiAPI(category, count, apiKey) }
         );
-    } else {
-        // No API key, use free APIs only
+    } else if (isOpenAIKey) {
+        // OpenAI API key provided
         apis.push(
-            { name: 'Hugging Face', fn: () => tryHuggingFaceAPI(category, count) }
+            { name: 'OpenAI', fn: () => tryOpenAIAPI(category, count, apiKey) }
         );
     }
+    
+    // Always add fallback (no API key needed)
+    apis.push(
+        { name: 'Fallback Generator', fn: () => generateFallbackQuestions(category, count) }
+    );
 
     for (const api of apis) {
         try {
@@ -1719,58 +1725,42 @@ Wichtig: correct ist der Index (0-3) der richtigen Antwort. Antworte NUR mit dem
     return generateFallbackQuestions(category, count);
 }
 
-// Hugging Face Inference API (FREE - no API key needed for public models)
-async function tryHuggingFaceAPI(category, count) {
-    // Using a free text generation model from Hugging Face
-    const model = 'mistralai/Mistral-7B-Instruct-v0.2'; // Free public model
-    
-    const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            // No API key needed for public models, but you can add one for higher rate limits
-        },
-        body: JSON.stringify({
-            inputs: `Erstelle ${count} Quiz-Fragen zum Thema "${category}". Format: JSON-Array mit {question, answers: [4 Antworten], correct: 0-3}.`,
-            parameters: {
-                max_new_tokens: 2000,
-                temperature: 0.7,
-                return_full_text: false
-            }
-        })
-    });
-
-    if (!response.ok) {
-        if (response.status === 503) {
-            // Model is loading, wait and retry
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            return tryHuggingFaceAPI(category, count);
-        }
-        throw new Error(`Hugging Face API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content = Array.isArray(data) ? data[0].generated_text : data.generated_text;
-    
-    // Extract JSON from response
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-        try {
-            const questions = JSON.parse(jsonMatch[0]);
-            return Array.isArray(questions) ? questions : [];
-        } catch (e) {
-            throw new Error('Invalid JSON response from Hugging Face');
-        }
-    }
-    
-    throw new Error('No valid JSON found in response');
-}
+// Note: Hugging Face removed due to CORS issues
+// Using fallback generator instead
 
 // Google Gemini API (FREE tier available)
 async function tryGeminiAPI(category, count, apiKey) {
     // If no API key provided, skip Gemini
     if (!apiKey) {
         throw new Error('No API key provided');
+    }
+
+    // First, list available models to find the correct one
+    let availableModel = null;
+    try {
+        const listResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        if (listResponse.ok) {
+            const modelsData = await listResponse.json();
+            console.log('Available Gemini models:', modelsData.models?.map(m => m.name));
+            
+            // Find a model that supports generateContent
+            const model = modelsData.models?.find(m => {
+                const name = m.name || '';
+                const supportsGenerate = m.supportedGenerationMethods?.includes('generateContent');
+                return (name.includes('gemini') || name.includes('models/gemini')) && supportsGenerate;
+            });
+            
+            if (model) {
+                availableModel = model.name;
+                console.log('Found Gemini model:', availableModel);
+            } else {
+                console.warn('No suitable Gemini model found, will try default names');
+            }
+        } else {
+            console.warn('Could not list models, status:', listResponse.status);
+        }
+    } catch (e) {
+        console.warn('Could not list models, using default:', e);
     }
 
     const prompt = `Erstelle ${count} Quiz-Fragen zum Thema "${category}". 
@@ -1792,12 +1782,34 @@ Antworte NUR mit einem JSON-Array im folgenden Format:
 
 Wichtig: correct ist der Index (0-3) der richtigen Antwort. Antworte NUR mit dem JSON-Array, keine zusätzlichen Erklärungen.`;
 
-    // Try different Gemini API endpoints
-    const endpoints = [
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
-        `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${apiKey}`
-    ];
+    // Try different Gemini API endpoints with correct model names
+    let modelNames = [];
+    
+    if (availableModel) {
+        // Use the model found from API
+        modelNames = [availableModel];
+    } else {
+        // Try common model names (without 'models/' prefix if API expects it differently)
+        modelNames = [
+            'gemini-1.5-flash-latest',
+            'gemini-1.5-pro-latest',
+            'gemini-1.5-flash',
+            'gemini-1.5-pro',
+            'gemini-pro-latest',
+            'gemini-pro'
+        ];
+    }
+    
+    // Try both with and without 'models/' prefix, and with different API versions
+    const endpoints = [];
+    for (const model of modelNames) {
+        // Try v1beta with models/ prefix
+        endpoints.push(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`);
+        // Try v1beta without models/ prefix
+        endpoints.push(`https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${apiKey}`);
+        // Try v1 with models/ prefix
+        endpoints.push(`https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`);
+    }
 
     for (const endpoint of endpoints) {
         try {
@@ -1944,7 +1956,7 @@ function generateFallbackQuestions(category, count) {
         });
     }
     
-    showModal('Warnung', 'Fallback-Modus: Bitte gib einen OpenAI API Key ein für bessere Fragen!', 'warning');
+    // No warning needed - this is now a valid fallback option
     return questions;
 }
 
