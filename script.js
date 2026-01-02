@@ -1123,16 +1123,13 @@ function updateUI() {
             
             // Only mark as selected if this is the current user's own answer
             // CRITICAL: Only check the answerKey for the current user, never the other streamer's answer
-            if (answerKey && gameState.answers[answerKey] !== null && gameState.answers[answerKey] !== undefined && gameState.answers[answerKey] === index) {
+            // Also ensure the answer is not null/undefined
+            const currentAnswer = answerKey ? gameState.answers[answerKey] : null;
+            if (answerKey && currentAnswer !== null && currentAnswer !== undefined && currentAnswer === index) {
                 answerBtn.classList.add('selected');
-                console.log('Marking answer as selected:', {
-                    answerKey: answerKey,
-                    answerIndex: index,
-                    currentAnswer: gameState.answers[answerKey],
-                    currentRole: currentRole
-                });
             } else {
                 // Make sure we don't show other streamer's answers as selected
+                // Also remove selected class if answer was reset (e.g., new question)
                 answerBtn.classList.remove('selected');
             }
 
@@ -1414,6 +1411,21 @@ function listenToGameState() {
                 currentQuestionToUse = gameState.currentQuestion;
             }
             
+            // CRITICAL: If question changed, reset answers BEFORE syncing
+            // This prevents old answers from being carried over to the new question
+            const questionChanged = oldQuestionIndex !== data.questionIndex;
+            if (questionChanged) {
+                console.log('Question changed, resetting answers:', {
+                    oldIndex: oldQuestionIndex,
+                    newIndex: data.questionIndex
+                });
+                // Reset both answers when question changes
+                gameState.answers = {
+                    streamer1: null,
+                    streamer2: null
+                };
+            }
+            
             // Preserve local answers - only update from Firebase if we haven't answered yet
             // This prevents overwriting a streamer's own answer with another streamer's answer
             const answerKey = currentRole === 'streamer1' ? 'streamer1' : 
@@ -1421,7 +1433,11 @@ function listenToGameState() {
             
             // Build answers object - preserve own answer if already submitted
             // CRITICAL: Only update the OTHER streamer's answer from Firebase, never our own
-            const newAnswers = {
+            // Also: If question changed, always use null (already reset above)
+            const newAnswers = questionChanged ? {
+                streamer1: null,
+                streamer2: null
+            } : {
                 streamer1: (answerKey === 'streamer1' && gameState.answers.streamer1 !== null && gameState.answers.streamer1 !== undefined)
                     ? gameState.answers.streamer1  // Keep own answer
                     : (data.answers?.streamer1 ?? gameState.answers.streamer1 ?? null),
@@ -1433,6 +1449,9 @@ function listenToGameState() {
             console.log('Syncing answers:', {
                 currentRole: currentRole,
                 answerKey: answerKey,
+                questionChanged: questionChanged,
+                oldQuestionIndex: oldQuestionIndex,
+                newQuestionIndex: data.questionIndex,
                 localAnswers: gameState.answers,
                 firebaseAnswers: data.answers,
                 newAnswers: newAnswers
@@ -1475,12 +1494,7 @@ function listenToGameState() {
                 }
             }
 
-            // If question changed, reset local answer
-            if (oldQuestionIndex !== gameState.questionIndex) {
-                const answerKey = currentRole === 'streamer1' ? 'streamer1' : 'streamer2';
-                gameState.answers[answerKey] = null;
-                console.log('Question index changed, reset answer for', answerKey);
-            }
+            // Answers are already reset above if question changed, so no need to reset here again
 
             // Load videos if changed or if we don't have videos yet
             if (data.videoLinks) {
