@@ -502,7 +502,20 @@ function initHostControls() {
             }
         } catch (error) {
             console.error('Error generating questions:', error);
-            showModal('Fehler', `Fehler beim Generieren der Fragen: ${error.message}`, 'error');
+            let errorMessage = error.message || 'Unbekannter Fehler';
+            
+            // Provide helpful error messages
+            if (errorMessage.includes('API key') || errorMessage.includes('401') || errorMessage.includes('403')) {
+                errorMessage = 'Ungültiger API Key. Bitte überprüfe deinen Google Gemini API Key.\n\nTipp: Versuche es ohne API Key (verwendet kostenlose Alternative)';
+            } else if (errorMessage.includes('429')) {
+                errorMessage = 'Rate Limit erreicht. Bitte warte einen Moment und versuche es erneut.';
+            } else if (errorMessage.includes('404')) {
+                errorMessage = 'API-Endpunkt nicht gefunden. Bitte versuche es später erneut.';
+            } else if (errorMessage.includes('400')) {
+                errorMessage = 'Ungültige Anfrage. Bitte überprüfe deinen API Key und versuche es erneut.';
+            }
+            
+            showModal('Fehler', `Fehler beim Generieren der Fragen:\n\n${errorMessage}`, 'error');
         } finally {
             generateAIQuestionsBtn.disabled = false;
             aiLoading.style.display = 'none';
@@ -1669,11 +1682,23 @@ Antworte NUR mit einem JSON-Array im folgenden Format:
 Wichtig: correct ist der Index (0-3) der richtigen Antwort. Antworte NUR mit dem JSON-Array, keine zusätzlichen Erklärungen.`;
 
     // Try multiple free APIs in order
-    const apis = [
-        { name: 'Hugging Face', fn: () => tryHuggingFaceAPI(category, count) },
-        { name: 'Google Gemini', fn: () => tryGeminiAPI(category, count, apiKey) },
-        { name: 'OpenAI', fn: () => tryOpenAIAPI(category, count, apiKey) }
-    ];
+    // If API key is provided, try paid APIs first (better quality)
+    // Otherwise, use free APIs
+    const apis = [];
+    
+    if (apiKey) {
+        // If API key provided, try Gemini and OpenAI first
+        apis.push(
+            { name: 'Google Gemini', fn: () => tryGeminiAPI(category, count, apiKey) },
+            { name: 'OpenAI', fn: () => tryOpenAIAPI(category, count, apiKey) },
+            { name: 'Hugging Face', fn: () => tryHuggingFaceAPI(category, count) }
+        );
+    } else {
+        // No API key, use free APIs only
+        apis.push(
+            { name: 'Hugging Face', fn: () => tryHuggingFaceAPI(category, count) }
+        );
+    }
 
     for (const api of apis) {
         try {
@@ -1748,34 +1773,111 @@ async function tryGeminiAPI(category, count, apiKey) {
         throw new Error('No API key provided');
     }
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            contents: [{
-                parts: [{
-                    text: `Erstelle ${count} Quiz-Fragen zum Thema "${category}". Format: JSON-Array mit {question, answers: [4 Antworten], correct: 0-3}. Antworte NUR mit JSON-Array.`
-                }]
-            }]
-        })
-    });
+    const prompt = `Erstelle ${count} Quiz-Fragen zum Thema "${category}". 
+Jede Frage muss:
+- Eine klare, verständliche Frage sein
+- 4 Antwortmöglichkeiten haben (A, B, C, D)
+- Eine eindeutig richtige Antwort haben
+- Die anderen 3 Antworten sollten plausibel, aber falsch sein
 
-    if (!response.ok) {
-        throw new Error(`Gemini API error: ${response.status}`);
-    }
+Antworte NUR mit einem JSON-Array im folgenden Format:
+[
+  {
+    "question": "Die Frage hier",
+    "answers": ["Antwort A", "Antwort B", "Antwort C", "Antwort D"],
+    "correct": 0
+  },
+  ...
+]
 
-    const data = await response.json();
-    const content = data.candidates[0].content.parts[0].text;
-    
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-        const questions = JSON.parse(jsonMatch[0]);
-        return Array.isArray(questions) ? questions : [];
+Wichtig: correct ist der Index (0-3) der richtigen Antwort. Antworte NUR mit dem JSON-Array, keine zusätzlichen Erklärungen.`;
+
+    // Try different Gemini API endpoints
+    const endpoints = [
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${apiKey}`
+    ];
+
+    for (const endpoint of endpoints) {
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{
+                            text: prompt
+                        }]
+                    }]
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Gemini API error:', response.status, errorText);
+                
+                // If it's a 404 or 400, try next endpoint
+                if (response.status === 404 || response.status === 400) {
+                    continue;
+                }
+                
+                // For other errors, throw with more details
+                let errorMessage = `Gemini API error: ${response.status}`;
+                try {
+                    const errorData = JSON.parse(errorText);
+                    errorMessage += ` - ${errorData.error?.message || errorText}`;
+                } catch (e) {
+                    errorMessage += ` - ${errorText.substring(0, 100)}`;
+                }
+                throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+            
+            // Handle different response structures
+            let content = '';
+            if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+                content = data.candidates[0].content.parts[0].text;
+            } else if (data.text) {
+                content = data.text;
+            } else {
+                console.error('Unexpected Gemini response structure:', data);
+                continue; // Try next endpoint
+            }
+            
+            // Extract JSON from response
+            const jsonMatch = content.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+                try {
+                    const questions = JSON.parse(jsonMatch[0]);
+                    if (Array.isArray(questions) && questions.length > 0) {
+                        console.log(`Successfully generated ${questions.length} questions with Gemini`);
+                        return questions;
+                    }
+                } catch (e) {
+                    console.error('JSON parse error:', e);
+                    continue; // Try next endpoint
+                }
+            }
+            
+            // If we get here, the response didn't contain valid JSON
+            console.warn('No valid JSON found in Gemini response, trying next endpoint...');
+            continue;
+        } catch (error) {
+            console.error('Gemini API request failed:', error);
+            // If this is the last endpoint, throw the error
+            if (endpoint === endpoints[endpoints.length - 1]) {
+                throw error;
+            }
+            // Otherwise, try next endpoint
+            continue;
+        }
     }
     
-    throw new Error('No valid JSON found in Gemini response');
+    throw new Error('Alle Gemini API Endpunkte fehlgeschlagen');
 }
 
 // OpenAI API (if API key provided)
