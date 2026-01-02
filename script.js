@@ -1117,12 +1117,23 @@ function updateUI() {
             span.textContent = answer;
             answerBtn.appendChild(span);
 
-            // Check if already answered
+            // Check if already answered - ONLY show selection for the current user's own answer
             const answerKey = currentRole === 'streamer1' ? 'streamer1' : 
                              currentRole === 'streamer2' ? 'streamer2' : null;
             
-            if (answerKey && gameState.answers[answerKey] === index) {
+            // Only mark as selected if this is the current user's own answer
+            // CRITICAL: Only check the answerKey for the current user, never the other streamer's answer
+            if (answerKey && gameState.answers[answerKey] !== null && gameState.answers[answerKey] !== undefined && gameState.answers[answerKey] === index) {
                 answerBtn.classList.add('selected');
+                console.log('Marking answer as selected:', {
+                    answerKey: answerKey,
+                    answerIndex: index,
+                    currentAnswer: gameState.answers[answerKey],
+                    currentRole: currentRole
+                });
+            } else {
+                // Make sure we don't show other streamer's answers as selected
+                answerBtn.classList.remove('selected');
             }
 
             // Show correct/incorrect if in result state
@@ -1403,6 +1414,30 @@ function listenToGameState() {
                 currentQuestionToUse = gameState.currentQuestion;
             }
             
+            // Preserve local answers - only update from Firebase if we haven't answered yet
+            // This prevents overwriting a streamer's own answer with another streamer's answer
+            const answerKey = currentRole === 'streamer1' ? 'streamer1' : 
+                             currentRole === 'streamer2' ? 'streamer2' : null;
+            
+            // Build answers object - preserve own answer if already submitted
+            // CRITICAL: Only update the OTHER streamer's answer from Firebase, never our own
+            const newAnswers = {
+                streamer1: (answerKey === 'streamer1' && gameState.answers.streamer1 !== null && gameState.answers.streamer1 !== undefined)
+                    ? gameState.answers.streamer1  // Keep own answer
+                    : (data.answers?.streamer1 ?? gameState.answers.streamer1 ?? null),
+                streamer2: (answerKey === 'streamer2' && gameState.answers.streamer2 !== null && gameState.answers.streamer2 !== undefined)
+                    ? gameState.answers.streamer2  // Keep own answer
+                    : (data.answers?.streamer2 ?? gameState.answers.streamer2 ?? null)
+            };
+            
+            console.log('Syncing answers:', {
+                currentRole: currentRole,
+                answerKey: answerKey,
+                localAnswers: gameState.answers,
+                firebaseAnswers: data.answers,
+                newAnswers: newAnswers
+            });
+            
             gameState = {
                 ...gameState,
                 ...data,
@@ -1410,11 +1445,8 @@ function listenToGameState() {
                 questions: questionsToUse,
                 // Preserve currentQuestion if we have one, otherwise set to null
                 currentQuestion: currentQuestionToUse,
-                // Preserve local answers until evaluated
-                answers: {
-                    streamer1: data.answers?.streamer1 ?? gameState.answers.streamer1,
-                    streamer2: data.answers?.streamer2 ?? gameState.answers.streamer2
-                }
+                // Use preserved answers
+                answers: newAnswers
             };
 
             // CRITICAL: Always ensure currentQuestion is set when status is active
