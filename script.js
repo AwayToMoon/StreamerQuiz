@@ -234,7 +234,12 @@ function loginSuccess() {
                     if (data.round !== undefined) gameState.round = data.round;
                     if (data.scores) gameState.scores = data.scores;
                     if (data.currentQuestion) gameState.currentQuestion = data.currentQuestion;
-                    if (data.videoLinks) gameState.videoLinks = data.videoLinks;
+                    if (data.videoLinks) {
+                        gameState.videoLinks = {
+                            streamer1: data.videoLinks.streamer1 || '',
+                            streamer2: data.videoLinks.streamer2 || ''
+                        };
+                    }
                     
                     // Ensure currentQuestion is set if status is active
                     if (gameState.status === 'active' && !gameState.currentQuestion) {
@@ -246,7 +251,9 @@ function loginSuccess() {
                     }
                     
                     updateUI();
-                    if (data.videoLinks) {
+                    // Always load videos if links are available
+                    if (data.videoLinks && (data.videoLinks.streamer1 || data.videoLinks.streamer2)) {
+                        console.log('Streamer: Loading videos on initial login', data.videoLinks);
                         loadVideos();
                     }
                 }
@@ -1277,11 +1284,12 @@ function updateGameState() {
         return;
     }
 
-    // Ensure questions are included in the update
+    // Ensure questions and videoLinks are included in the update
     const stateToUpdate = {
         ...gameState,
         questions: gameState.questions, // Explicitly include questions
         currentQuestion: gameState.currentQuestion, // Include current question
+        videoLinks: gameState.videoLinks, // Explicitly include video links
         lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
     };
 
@@ -1325,13 +1333,21 @@ function listenToGameState() {
             // Host should also update UI when state changes (for immediate feedback)
             // but we need to be careful not to overwrite local changes
             if (currentRole === 'host') {
-                // Host controls the state, but sync videos and update UI
-                if (data.videoLinks && 
-                    (data.videoLinks.streamer1 !== gameState.videoLinks.streamer1 ||
-                     data.videoLinks.streamer2 !== gameState.videoLinks.streamer2)) {
-                    gameState.videoLinks = data.videoLinks;
+            // Host controls the state, but sync videos and update UI
+            if (data.videoLinks) {
+                const linksChanged = 
+                    data.videoLinks.streamer1 !== gameState.videoLinks.streamer1 ||
+                    data.videoLinks.streamer2 !== gameState.videoLinks.streamer2;
+                
+                if (linksChanged) {
+                    gameState.videoLinks = {
+                        streamer1: data.videoLinks.streamer1 || '',
+                        streamer2: data.videoLinks.streamer2 || ''
+                    };
+                    console.log('Host: Video links updated from Firebase, reloading videos...', gameState.videoLinks);
                     loadVideos();
                 }
+            }
                 
                 // CRITICAL: Host must receive answers from streamers to show live answers
                 if (data.answers) {
@@ -1434,12 +1450,24 @@ function listenToGameState() {
                 console.log('Question index changed, reset answer for', answerKey);
             }
 
-            // Load videos if changed
-            if (data.videoLinks && 
-                (data.videoLinks.streamer1 !== gameState.videoLinks.streamer1 ||
-                 data.videoLinks.streamer2 !== gameState.videoLinks.streamer2)) {
-                gameState.videoLinks = data.videoLinks;
-                loadVideos();
+            // Load videos if changed or if we don't have videos yet
+            if (data.videoLinks) {
+                const linksChanged = 
+                    data.videoLinks.streamer1 !== gameState.videoLinks.streamer1 ||
+                    data.videoLinks.streamer2 !== gameState.videoLinks.streamer2;
+                
+                const hasLinks = 
+                    (data.videoLinks.streamer1 && data.videoLinks.streamer1.trim()) ||
+                    (data.videoLinks.streamer2 && data.videoLinks.streamer2.trim());
+                
+                if (linksChanged || (hasLinks && (!gameState.videoLinks.streamer1 && !gameState.videoLinks.streamer2))) {
+                    gameState.videoLinks = {
+                        streamer1: data.videoLinks.streamer1 || '',
+                        streamer2: data.videoLinks.streamer2 || ''
+                    };
+                    console.log('Streamer: Video links updated, loading videos...', gameState.videoLinks);
+                    loadVideos();
+                }
             }
 
             console.log('Updating UI after Firebase sync');
