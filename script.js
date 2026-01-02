@@ -461,6 +461,54 @@ function initHostControls() {
         });
     });
 
+    // AI Question Generation
+    const generateAIQuestionsBtn = document.getElementById('generate-ai-questions-btn');
+    const aiLoading = document.getElementById('ai-loading');
+    
+    generateAIQuestionsBtn.addEventListener('click', async () => {
+        const category = document.getElementById('ai-category-input').value.trim();
+        const questionCount = parseInt(document.getElementById('ai-question-count').value) || 10;
+        const apiKey = document.getElementById('ai-api-key-input').value.trim();
+
+        if (!category) {
+            showModal('Fehler', 'Bitte gib eine Kategorie ein!', 'error');
+            return;
+        }
+
+        if (questionCount < 1 || questionCount > 50) {
+            showModal('Fehler', 'Bitte gib eine Anzahl zwischen 1 und 50 ein!', 'error');
+            return;
+        }
+
+        // Show loading state
+        generateAIQuestionsBtn.disabled = true;
+        aiLoading.style.display = 'block';
+
+        try {
+            const questions = await generateQuestionsWithAI(category, questionCount, apiKey);
+            
+            if (questions && questions.length > 0) {
+                // Add questions to gameState
+                gameState.questions.push(...questions);
+                updateGameState();
+                
+                showModal('Erfolg', `${questions.length} Fragen erfolgreich generiert!\n\n(${gameState.questions.length} Fragen insgesamt)`, 'success');
+                
+                // Clear inputs
+                document.getElementById('ai-category-input').value = '';
+                document.getElementById('ai-question-count').value = '10';
+            } else {
+                showModal('Fehler', 'Es konnten keine Fragen generiert werden. Bitte versuche es erneut.', 'error');
+            }
+        } catch (error) {
+            console.error('Error generating questions:', error);
+            showModal('Fehler', `Fehler beim Generieren der Fragen: ${error.message}`, 'error');
+        } finally {
+            generateAIQuestionsBtn.disabled = false;
+            aiLoading.style.display = 'none';
+        }
+    });
+
     addQuestionBtn.addEventListener('click', () => {
         const questionText = document.getElementById('question-text-input').value.trim();
         const answers = Array.from(document.querySelectorAll('.answer-input')).map(input => input.value.trim());
@@ -1564,157 +1612,114 @@ function listenToGameState() {
     });
 }
 
-// Initialize default questions - 30 Schwierige Anime Fragen (jeweils aus einem anderen Anime)
-gameState.questions = [
-    {
-        question: "Wie heißt der Stand von Jotaro Kujo in 'JoJo's Bizarre Adventure: Stardust Crusaders'?",
-        answers: ["Star Platinum", "The World", "Hierophant Green", "Silver Chariot"],
-        correct: 0
-    },
-    {
-        question: "Welche Blutgruppe hat der Hauptcharakter in 'Tokyo Ghoul' nach seiner Transformation?",
-        answers: ["O+", "AB-", "Keine (Ghoul)", "B+"],
-        correct: 2
-    },
-    {
-        question: "Wie viele Jahre war Luffy in 'One Piece' beim Training mit Rayleigh?",
-        answers: ["1 Jahr", "1,5 Jahre", "2 Jahre", "3 Jahre"],
-        correct: 2
-    },
-    {
-        question: "Welcher Charakter in 'Attack on Titan' ist der 'Beast Titan'?",
-        answers: ["Eren Jaeger", "Zeke Jaeger", "Reiner Braun", "Bertolt Hoover"],
-        correct: 1
-    },
-    {
-        question: "Wie heißt die Schwester von Killua in 'Hunter x Hunter'?",
-        answers: ["Alluka", "Kalluto", "Milluki", "Illumi"],
-        correct: 0
-    },
-    {
-        question: "Welche Nummer hat der 'One for All' Quirk in 'My Hero Academia'?",
-        answers: ["7", "8", "9", "10"],
-        correct: 2
-    },
-    {
-        question: "Wie heißt der Vater von Tanjiro in 'Demon Slayer'?",
-        answers: ["Tanjuro Kamado", "Kie Kamado", "Takeo Kamado", "Shigeru Kamado"],
-        correct: 0
-    },
-    {
-        question: "Welcher Charakter in 'Death Note' ist der zweite L?",
-        answers: ["Mello", "Near", "Matt", "Misa Amane"],
-        correct: 1
-    },
-    {
-        question: "Welche Farbe hat der 'Bankai' von Byakuya Kuchiki in 'Bleach'?",
-        answers: ["Weiß", "Rosa", "Blau", "Schwarz"],
-        correct: 0
-    },
-    {
-        question: "Wie heißt der echte Name von 'King' in 'One Punch Man'?",
-        answers: ["Saitama", "Genos", "Er hat keinen Namen", "Tatsumaki"],
-        correct: 2
-    },
-    {
-        question: "Welcher Charakter in 'Fullmetal Alchemist' ist der 'Flame Alchemist'?",
-        answers: ["Edward Elric", "Roy Mustang", "Riza Hawkeye", "Maes Hughes"],
-        correct: 1
-    },
-    {
-        question: "Wie viele 'Cursed Techniques' hat Satoru Gojo in 'Jujutsu Kaisen'?",
-        answers: ["1", "2", "3", "4"],
-        correct: 1
-    },
-    {
-        question: "Welcher Charakter in 'Naruto' ist der 'Copy Ninja'?",
-        answers: ["Kakashi Hatake", "Might Guy", "Asuma Sarutobi", "Kurenai Yuhi"],
-        correct: 0
-    },
-    {
-        question: "Wie heißt der 'Devil' von Power in 'Chainsaw Man'?",
-        answers: ["Blood Devil", "Power Devil", "Control Devil", "Gun Devil"],
-        correct: 0
-    },
-    {
-        question: "Welcher Charakter in 'Code Geass' hat den Geass 'Absolute Obedience'?",
-        answers: ["Lelouch", "C.C.", "Mao", "Rolo"],
-        correct: 3
-    },
-    {
-        question: "Welcher Charakter in 'The Promised Neverland' ist der 'Jäger'?",
-        answers: ["Norman", "Ray", "Isabella", "Peter Ratri"],
-        correct: 3
-    },
-    {
-        question: "Welcher Charakter in 'Steins;Gate' hat die Fähigkeit 'Reading Steiner'?",
-        answers: ["Rintaro Okabe", "Kurisu Makise", "Mayuri Shiina", "Itaru Hashida"],
-        correct: 0
-    },
-    {
-        question: "Welcher Charakter in 'Mob Psycho 100' ist der 'Greatest Psychic of the 20th Century'?",
-        answers: ["Reigen Arataka", "Shigeo Kageyama", "Toichiro Suzuki", "Dimple"],
-        correct: 0
-    },
-    {
-        question: "Wie heißt der 'Grimoire' von Asta in 'Black Clover'?",
-        answers: ["5-Blatt Grimoire", "4-Blatt Grimoire", "3-Blatt Grimoire", "Anti-Magic Grimoire"],
-        correct: 0
-    },
-    {
-        question: "Welcher Charakter in 'Fairy Tail' ist der 'Salamander'?",
-        answers: ["Natsu Dragneel", "Gray Fullbuster", "Erza Scarlet", "Lucy Heartfilia"],
-        correct: 0
-    },
-    {
-        question: "Wie viele 'Dragon Balls' gibt es in 'Dragon Ball Z' insgesamt?",
-        answers: ["5", "6", "7", "8"],
-        correct: 2
-    },
-    {
-        question: "Welcher Charakter in 'Neon Genesis Evangelion' ist der 'First Child'?",
-        answers: ["Shinji Ikari", "Rei Ayanami", "Asuka Langley", "Kaworu Nagisa"],
-        correct: 1
-    },
-    {
-        question: "Wie heißt das Raumschiff in 'Cowboy Bebop'?",
-        answers: ["Bebop", "Swordfish", "Red Tail", "Hammer Head"],
-        correct: 0
-    },
-    {
-        question: "Welcher Charakter in 'Trigun' hat die Belohnung von 60 Milliarden Double Dollars?",
-        answers: ["Vash the Stampede", "Nicholas D. Wolfwood", "Meryl Stryfe", "Millions Knives"],
-        correct: 0
-    },
-    {
-        question: "Wie heißt der 'Gurren Lagann' in 'Tengen Toppa Gurren Lagann'?",
-        answers: ["Gurren Lagann", "Lazengann", "Arcadia Gurren", "Super Galaxy Gurren Lagann"],
-        correct: 0
-    },
-    {
-        question: "Welcher Charakter in 'Kill la Kill' trägt das 'Kamui Senketsu'?",
-        answers: ["Ryuko Matoi", "Satsuki Kiryuin", "Mako Mankanshoku", "Ragyo Kiryuin"],
-        correct: 0
-    },
-    {
-        question: "Wie heißt die Fähigkeit von Subaru in 'Re:Zero'?",
-        answers: ["Return by Death", "Time Loop", "Reset Ability", "Checkpoint"],
-        correct: 0
-    },
-    {
-        question: "Welcher Charakter in 'Overlord' ist der 'Floor Guardian' des 7. Stockwerks?",
-        answers: ["Demiurge", "Albedo", "Shalltear Bloodfallen", "Cocytus"],
-        correct: 0
-    },
-    {
-        question: "Wie heißt das Königreich in 'No Game No Life', in dem Sora und Shiro landen?",
-        answers: ["Elchea", "Imanity", "Disboard", "Avant Heim"],
-        correct: 2
-    },
-    {
-        question: "Wie tief ist der 'Abyss' in 'Made in Abyss' insgesamt?",
-        answers: ["15.000 Meter", "20.000 Meter", "25.000 Meter", "30.000 Meter"],
-        correct: 1
+// Initialize empty questions array - questions will be generated by AI
+gameState.questions = [];
+
+// AI Question Generation Function
+async function generateQuestionsWithAI(category, count, apiKey) {
+    const prompt = `Erstelle ${count} Quiz-Fragen zum Thema "${category}". 
+Jede Frage muss:
+- Eine klare, verständliche Frage sein
+- 4 Antwortmöglichkeiten haben (A, B, C, D)
+- Eine eindeutig richtige Antwort haben
+- Die anderen 3 Antworten sollten plausibel, aber falsch sein
+
+Antworte NUR mit einem JSON-Array im folgenden Format:
+[
+  {
+    "question": "Die Frage hier",
+    "answers": ["Antwort A", "Antwort B", "Antwort C", "Antwort D"],
+    "correct": 0
+  },
+  ...
+]
+
+Wichtig: correct ist der Index (0-3) der richtigen Antwort. Antworte NUR mit dem JSON-Array, keine zusätzlichen Erklärungen.`;
+
+    try {
+        let response;
+        
+        if (apiKey) {
+            // Use OpenAI API if API key is provided
+            response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-3.5-turbo',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: 'Du bist ein Quiz-Fragen-Generator. Antworte NUR mit einem gültigen JSON-Array, keine zusätzlichen Erklärungen.'
+                        },
+                        {
+                            role: 'user',
+                            content: prompt
+                        }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 2000
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error?.message || 'OpenAI API Fehler');
+            }
+
+            const data = await response.json();
+            const content = data.choices[0].message.content.trim();
+            
+            // Extract JSON from response (in case there's extra text)
+            const jsonMatch = content.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+                const questions = JSON.parse(jsonMatch[0]);
+                return questions;
+            } else {
+                throw new Error('Ungültige Antwort von der KI');
+            }
+        } else {
+            // Fallback: Use a free AI API service (like Hugging Face Inference API)
+            // Note: This is a simplified example - you may need to adjust based on available services
+            showModal('Info', 'Für bessere Ergebnisse bitte einen OpenAI API Key eingeben. Verwende Fallback-Methode...', 'info');
+            
+            // Simple fallback: Generate basic questions locally
+            // This is a placeholder - in production, you'd want a proper fallback service
+            return generateFallbackQuestions(category, count);
+        }
+    } catch (error) {
+        console.error('AI generation error:', error);
+        
+        // Fallback to simple question generation
+        if (!apiKey) {
+            return generateFallbackQuestions(category, count);
+        }
+        
+        throw error;
     }
-];
+}
+
+// Fallback question generation (simple template-based)
+function generateFallbackQuestions(category, count) {
+    const questions = [];
+    
+    // This is a very basic fallback - in production you'd want a better solution
+    for (let i = 0; i < count; i++) {
+        questions.push({
+            question: `${category} Frage ${i + 1}: Was ist eine wichtige Information über ${category}?`,
+            answers: [
+                `Antwort A zu ${category}`,
+                `Antwort B zu ${category}`,
+                `Antwort C zu ${category}`,
+                `Antwort D zu ${category}`
+            ],
+            correct: Math.floor(Math.random() * 4)
+        });
+    }
+    
+    showModal('Warnung', 'Fallback-Modus: Bitte gib einen OpenAI API Key ein für bessere Fragen!', 'warning');
+    return questions;
+}
 
