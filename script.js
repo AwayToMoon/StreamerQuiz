@@ -556,6 +556,26 @@ function initHostControls() {
         questionsManagerModal.classList.remove('active');
     });
 
+    // Delete all questions button
+    const deleteAllQuestionsBtn = document.getElementById('delete-all-questions-btn');
+    deleteAllQuestionsBtn.addEventListener('click', () => {
+        if (gameState.questions.length === 0) {
+            showModal('Info', 'Es sind keine Fragen vorhanden.', 'info');
+            return;
+        }
+
+        showConfirmModal(
+            'Alle Fragen löschen',
+            `Möchtest du wirklich alle ${gameState.questions.length} Fragen löschen?\n\nDiese Aktion kann nicht rückgängig gemacht werden!`,
+            () => {
+                gameState.questions = [];
+                updateGameState();
+                renderQuestionsList();
+                showModal('Erfolg', 'Alle Fragen wurden erfolgreich gelöscht!', 'success');
+            }
+        );
+    });
+
     // Close modal on background click
     questionsManagerModal.addEventListener('click', (e) => {
         if (e.target === questionsManagerModal) {
@@ -567,7 +587,19 @@ function initHostControls() {
 // Fragen-Liste rendern
 function renderQuestionsList() {
     const questionsList = document.getElementById('questions-list');
+    const deleteAllBtn = document.getElementById('delete-all-questions-btn');
     questionsList.innerHTML = '';
+
+    // Enable/disable delete all button based on questions count
+    if (deleteAllBtn) {
+        if (gameState.questions.length === 0) {
+            deleteAllBtn.disabled = true;
+            deleteAllBtn.style.opacity = '0.5';
+        } else {
+            deleteAllBtn.disabled = false;
+            deleteAllBtn.style.opacity = '1';
+        }
+    }
 
     if (gameState.questions.length === 0) {
         questionsList.innerHTML = `
