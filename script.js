@@ -370,6 +370,7 @@ function initHostControls() {
         }
         
         // Load question first to ensure everything is set up properly
+        // This will update UI and sync to Firebase
         loadQuestion();
         
         // Update button states
@@ -426,7 +427,7 @@ function initHostControls() {
     });
 
     addQuestionBtn.addEventListener('click', () => {
-        const questionText = document.getElementById('question-text').value.trim();
+        const questionText = document.getElementById('question-text-input').value.trim();
         const answers = Array.from(document.querySelectorAll('.answer-input')).map(input => input.value.trim());
         const correctAnswer = parseInt(document.getElementById('correct-answer').value);
 
@@ -445,7 +446,7 @@ function initHostControls() {
         updateGameState();
 
         // Clear inputs
-        document.getElementById('question-text').value = '';
+        document.getElementById('question-text-input').value = '';
         document.querySelectorAll('.answer-input').forEach(input => input.value = '');
         document.getElementById('correct-answer').value = '0';
 
@@ -899,9 +900,7 @@ function loadQuestion() {
         answersCount: gameState.currentQuestion?.answers?.length
     });
 
-    // Update UI first to show question immediately
-    updateUI();
-    // Then sync to Firebase
+    // Sync to Firebase (this will also update UI)
     updateGameState();
 }
 
@@ -1001,7 +1000,7 @@ function updateUI() {
         }
 
         // Update question - should now always be available
-        const questionElement = document.getElementById('question-text');
+        const questionElement = document.getElementById('question-display-text');
         const questionNumberElement = document.getElementById('question-number');
         
         if (questionNumberElement) {
@@ -1009,36 +1008,44 @@ function updateUI() {
         }
         
         if (questionElement) {
-            // Try to ensure currentQuestion is set
-            if (!gameState.currentQuestion && gameState.questions && gameState.questions.length > 0) {
-                if (gameState.questionIndex >= 0 && gameState.questionIndex < gameState.questions.length) {
-                    gameState.currentQuestion = gameState.questions[gameState.questionIndex];
-                    console.log('updateUI: Loaded question from array, index:', gameState.questionIndex);
+            // Always try to ensure currentQuestion is set from questions array if missing
+            if (!gameState.currentQuestion || !gameState.currentQuestion.question) {
+                if (gameState.questions && gameState.questions.length > 0) {
+                    if (gameState.questionIndex >= 0 && gameState.questionIndex < gameState.questions.length) {
+                        gameState.currentQuestion = gameState.questions[gameState.questionIndex];
+                        console.log('updateUI: Loaded question from array, index:', gameState.questionIndex);
+                    }
                 }
             }
             
+            // Display question text
             if (gameState.currentQuestion && gameState.currentQuestion.question) {
                 questionElement.textContent = gameState.currentQuestion.question;
                 console.log('updateUI: Question text set:', gameState.currentQuestion.question.substring(0, 50));
             } else {
-                questionElement.textContent = 'Frage wird geladen...';
-                console.warn('updateUI: Question not available, attempting to load...', {
-                    hasQuestions: !!gameState.questions,
-                    questionsLength: gameState.questions?.length,
-                    questionIndex: gameState.questionIndex,
-                    hasCurrentQuestion: !!gameState.currentQuestion,
-                    currentQuestionKeys: gameState.currentQuestion ? Object.keys(gameState.currentQuestion) : null
-                });
-                
-                // Force reload if question is missing
+                // Last resort: try to load directly from array
                 if (gameState.questions && gameState.questions.length > 0 && gameState.questionIndex >= 0 && gameState.questionIndex < gameState.questions.length) {
                     const questionToLoad = gameState.questions[gameState.questionIndex];
-                    if (questionToLoad) {
+                    if (questionToLoad && questionToLoad.question) {
                         gameState.currentQuestion = questionToLoad;
-                        console.log('updateUI: Force loaded question:', questionToLoad.question?.substring(0, 50));
-                        // Update immediately without setTimeout
-                        questionElement.textContent = questionToLoad.question || 'Frage wird geladen...';
+                        questionElement.textContent = questionToLoad.question;
+                        console.log('updateUI: Force loaded question from array:', questionToLoad.question.substring(0, 50));
+                    } else {
+                        questionElement.textContent = 'Frage wird geladen...';
+                        console.warn('updateUI: Question not available', {
+                            hasQuestions: !!gameState.questions,
+                            questionsLength: gameState.questions?.length,
+                            questionIndex: gameState.questionIndex,
+                            questionAtIndex: questionToLoad
+                        });
                     }
+                } else {
+                    questionElement.textContent = 'Frage wird geladen...';
+                    console.warn('updateUI: No questions available or invalid index', {
+                        hasQuestions: !!gameState.questions,
+                        questionsLength: gameState.questions?.length,
+                        questionIndex: gameState.questionIndex
+                    });
                 }
             }
         }
@@ -1371,11 +1378,22 @@ function listenToGameState() {
                 ? data.questions 
                 : (gameState.questions && gameState.questions.length > 0 ? gameState.questions : []);
             
+            // Preserve currentQuestion if it exists and is valid, otherwise use from data
+            let currentQuestionToUse = null;
+            if (data.currentQuestion && data.currentQuestion.question) {
+                currentQuestionToUse = data.currentQuestion;
+            } else if (gameState.currentQuestion && gameState.currentQuestion.question) {
+                // Keep existing currentQuestion if data doesn't have one
+                currentQuestionToUse = gameState.currentQuestion;
+            }
+            
             gameState = {
                 ...gameState,
                 ...data,
                 // Use questions from Firebase if available, otherwise keep local
                 questions: questionsToUse,
+                // Preserve currentQuestion if we have one, otherwise set to null
+                currentQuestion: currentQuestionToUse,
                 // Preserve local answers until evaluated
                 answers: {
                     streamer1: data.answers?.streamer1 ?? gameState.answers.streamer1,
@@ -1385,10 +1403,9 @@ function listenToGameState() {
 
             // CRITICAL: Always ensure currentQuestion is set when status is active
             if (gameState.status === 'active') {
-                // Priority 1: Use currentQuestion from Firebase if available
-                if (data.currentQuestion && data.currentQuestion.question) {
-                    gameState.currentQuestion = data.currentQuestion;
-                    console.log('Using currentQuestion from Firebase');
+                // Priority 1: Use currentQuestion if already set
+                if (gameState.currentQuestion && gameState.currentQuestion.question) {
+                    console.log('Using existing currentQuestion');
                 }
                 // Priority 2: Load from questions array using questionIndex
                 else if (gameState.questions && gameState.questions.length > 0) {
@@ -1404,7 +1421,8 @@ function listenToGameState() {
                         hasQuestions: !!gameState.questions,
                         questionsLength: gameState.questions?.length,
                         questionIndex: gameState.questionIndex,
-                        hasDataCurrentQuestion: !!data.currentQuestion
+                        hasDataCurrentQuestion: !!data.currentQuestion,
+                        hasLocalCurrentQuestion: !!currentQuestionToUse
                     });
                 }
             }
