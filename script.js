@@ -400,7 +400,17 @@ function initHostControls() {
         if (gameState.status === 'active' && gameState.currentQuestion) {
             evaluateAnswers();
             showAnswersBtn.disabled = true;
-            nextQuestionBtn.disabled = false;
+            
+            // Check if this is the last question
+            const isLastQuestion = gameState.questionIndex >= gameState.questions.length - 1;
+            if (isLastQuestion) {
+                // For last question, don't enable next button (quiz is ending)
+                nextQuestionBtn.disabled = true;
+                // Show final result - it will be displayed via updateUI() with status 'result'
+                console.log('Last question answered, result will be shown to all');
+            } else {
+                nextQuestionBtn.disabled = false;
+            }
         }
     });
 
@@ -420,10 +430,22 @@ function initHostControls() {
             showAnswersBtn.disabled = false;
             nextQuestionBtn.disabled = true;
         } else {
-            const finalScore = `Quiz beendet!\n\nFinale Punktzahl:\n\nHigherCellF: ${gameState.scores.streamer1}\nOGAle_: ${gameState.scores.streamer2}`;
-            showModal('Quiz beendet!', finalScore, 'success', () => {
-                resetQuiz();
-            });
+            // Last question - result should already be shown from evaluateAnswers()
+            // Just show the final score modal after a short delay
+            console.log('Last question completed, showing final score...');
+            
+            setTimeout(() => {
+                const winner = gameState.scores.streamer1 > gameState.scores.streamer2 
+                    ? 'HigherCellF' 
+                    : gameState.scores.streamer2 > gameState.scores.streamer1 
+                        ? 'OGAle_' 
+                        : 'Unentschieden';
+                
+                const finalScore = `Quiz beendet!\n\nFinale Punktzahl:\n\nHigherCellF: ${gameState.scores.streamer1}\nOGAle_: ${gameState.scores.streamer2}\n\nGewinner: ${winner}`;
+                showModal('Quiz beendet!', finalScore, 'success', () => {
+                    resetQuiz();
+                });
+            }, 3000); // Show final score after 3 seconds (give time to see result)
         }
     });
 
@@ -920,7 +942,9 @@ function evaluateAnswers() {
         correctAnswer: correctAnswer,
         streamer1: answer1,
         streamer2: answer2,
-        currentScores: { ...gameState.scores }
+        currentScores: { ...gameState.scores },
+        questionIndex: gameState.questionIndex,
+        totalQuestions: gameState.questions.length
     });
 
     // Update scores - only if answer is not null/undefined and matches correct answer
@@ -935,9 +959,16 @@ function evaluateAnswers() {
 
     console.log('Final scores after evaluation:', gameState.scores);
 
+    // Set status to 'result' so all users (host and streamers) can see the result
     gameState.status = 'result';
+    
+    // Update to Firebase first to sync status to all clients
     updateGameState();
+    
+    // Then update UI to show result
     updateUI();
+    
+    console.log('Result status set, UI should show result for all users');
 }
 
 // Answer Submission (for streamers)
