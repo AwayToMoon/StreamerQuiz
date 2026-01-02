@@ -404,12 +404,16 @@ function initHostControls() {
             // Check if this is the last question
             const isLastQuestion = gameState.questionIndex >= gameState.questions.length - 1;
             if (isLastQuestion) {
-                // For last question, don't enable next button (quiz is ending)
-                nextQuestionBtn.disabled = true;
+                // For last question, enable button to finish quiz
+                nextQuestionBtn.disabled = false;
+                // Change button text to indicate quiz ending
+                nextQuestionBtn.innerHTML = '<i class="fas fa-flag-checkered"></i> Quiz beenden';
                 // Show final result - it will be displayed via updateUI() with status 'result'
                 console.log('Last question answered, result will be shown to all');
             } else {
                 nextQuestionBtn.disabled = false;
+                // Reset button text to default
+                nextQuestionBtn.innerHTML = '<i class="fas fa-forward"></i> Nächste Frage';
             }
         }
     });
@@ -429,6 +433,8 @@ function initHostControls() {
             
             showAnswersBtn.disabled = false;
             nextQuestionBtn.disabled = true;
+            // Reset button text to default
+            nextQuestionBtn.innerHTML = '<i class="fas fa-forward"></i> Nächste Frage';
         } else {
             // Last question - result should already be shown from evaluateAnswers()
             // Just show the final score modal after a short delay
